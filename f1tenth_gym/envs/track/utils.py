@@ -27,7 +27,7 @@ def find_track_dir(track_name: str) -> pathlib.Path:
         if no map directory matching the track name is found
     """
     map_dir = pathlib.Path(__file__).parent.parent.parent.parent / "maps"
-
+    print("Searching for map in: " + str(map_dir))
     if not (map_dir / track_name).exists():
         print("Downloading Files for: " + track_name)
         tracks_url = "http://api.f1tenth.org/" + track_name + ".tar.xz"
@@ -36,7 +36,7 @@ def find_track_dir(track_name: str) -> pathlib.Path:
             raise FileNotFoundError(f"No maps exists for {track_name}.")
 
         tempdir = tempfile.gettempdir() + "/"
-
+        print("Saving to: " + tempdir + track_name + ".tar.xz")
         with open(tempdir + track_name + ".tar.xz", "wb") as f:
             f.write(tracks_r.content)
 
