@@ -113,7 +113,6 @@ class Track:
             if the track cannot be loaded
         """
         try:
-            print(f"Looking with find_track_dir {track}")
             track_dir = find_track_dir(track)
             track_spec = Track.load_spec(
                 track=track, filespec=str(track_dir / f"{track_dir.stem}_map.yaml")
@@ -188,7 +187,7 @@ class Track:
         try:
             if type(path) is str:
                 path = pathlib.Path(path)
-
+        
             track_spec = Track.load_spec(
                 track=path.stem, filespec=path
             )
@@ -201,7 +200,7 @@ class Track:
 
             # load occupancy grid
             # Image path is from path + image name from track_spec
-            image_path = path.parent / track_spec.image
+            image_path = path.parent / track_spec.image  
             image = Image.open(image_path).transpose(Transpose.FLIP_TOP_BOTTOM)
             occupancy_map = np.array(image).astype(np.float32)
             occupancy_map[occupancy_map <= 128] = 0.0

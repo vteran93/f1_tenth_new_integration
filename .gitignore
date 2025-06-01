@@ -175,7 +175,3 @@ cython_debug/
 examples/wandb
 examples/models
 examples/runs
-examples/videos
-runs/
-videos/
-wandb/

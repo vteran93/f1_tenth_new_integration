@@ -218,7 +218,7 @@ class PurePursuitPlanner:
         update waypoints being drawn by EnvRenderer
         """
         if self.current_index is not None:
-            points = self.waypoints[self.current_index: self.current_index + 10, :2]
+            points = self.waypoints[self.current_index : self.current_index + 10, :2]
             if self.local_plan_render is None:
                 self.local_plan_render = e.render_lines(
                     points, color=(0, 128, 0), size=1
@@ -318,7 +318,7 @@ def main():
             "observation_config": {"type": "kinematic_state"},
             "params": F110Env.fullscale_vehicle_params(),
             "reset_config": {"type": "rl_random_static"},
-            "scale": 1.0,
+            "scale": 10.0,
         },
         render_mode="human",
     )
