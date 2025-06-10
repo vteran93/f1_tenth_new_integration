@@ -353,9 +353,11 @@ class VictorMultiAgentEnv(KohondaMultiAgentF110Env):
             obs_dict[agent_id] = self._observation(i, original_obs)
 
         return obs_dict, info
+    # Step llamado por monitor.py
 
     def step(self, action: dict) -> Tuple[dict, float, bool, bool, dict]:
         original_obs, _, done, truncated, info = super().step(action)
+        # Esta clase debe llamar es el método step de F1Tenth, no tiene sentido llamar Kohonda
 
         if self.num_agents == 1:
             pt, idx = self.calc_current_waypoint(0)
@@ -389,9 +391,14 @@ class VictorMultiAgentEnv(KohondaMultiAgentF110Env):
             self.prev_yaw[agent_index] = float(std_state["yaw"])
 
         reward = self._get_reward()
+        # Get reward tiene el problema de que esta devolviendo la puntuación total de todos los agentes, no la de cada uno;
+        # si devuelves la recompensa de cada uno; SAC de SB3 no es capaz de recibir los argumentos y falla en el monitor.py
+        # en el paso de     self.rewards.append(float(reward)) de collect_rollouts, stable baselines3 no sirve para multi-agente
+        # Entonces, debes devolver la recompensa de un solo agente. El otro agente sería un dummy que da vueltas a la pista sin aprender nada.
+        # ¿Por ejemplo a ese dummy lo controle waypoints? ¿Como se haría?
         return obs_dict, reward, done, truncated, info
 
-    def _get_reward(self):
+    def _get_reward(self):  # Para un solo agente
         # Parámetros de la política
         PENALIZACION_QUIETO = -5.0  # Penalización fuerte por quedarse quieto
         PREMIO_VEL_CONST = 2.0      # Premio por velocidad constante deseada
@@ -459,4 +466,5 @@ class VictorMultiAgentEnv(KohondaMultiAgentF110Env):
                     f"[WARN] Agent {i} invalid reward dist={dist}, pen={pen}")
                 r = -1.0
             total += r
-        return total
+        return [total, 500]
+
