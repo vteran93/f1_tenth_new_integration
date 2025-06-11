@@ -206,7 +206,7 @@ def setup_training():
     
     # Training loop
     TOTAL_TIMESTEPS = 20_000
-    SAVE_EVERY = 2000
+    SAVE_EVERY = 200
     
     while True:
         result = algo.train()
@@ -215,7 +215,7 @@ def setup_training():
         if timesteps_total % SAVE_EVERY == 0:
             print(f"Timesteps: {timesteps_total}")
             algo.save(model_dir)
-        
+            
         if timesteps_total >= TOTAL_TIMESTEPS:
             break
     
