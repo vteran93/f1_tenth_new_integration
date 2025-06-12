@@ -100,14 +100,26 @@ class MultiAgentF110(MultiAgentEnv):
         actions = np.array([action_dict[agent] for agent in self.agents])
         obs, _, terminated, truncated, info = self.env.step(actions)
 
-        # Calculate rewards
+        # Progress-based reward with collision penalty
         rewards = []
         for i in range(self.env.num_agents):
-            pos = (self.env.poses_x[i], self.env.poses_y[i])
-            progress = np.linalg.norm(np.array(pos) - np.array(self._last_positions[i]))
-            reward = progress * 10.0 + 0.1 - (100.0 if self.env.collisions[i] else 0.0)
+            current_pos = (self.env.poses_x[i], self.env.poses_y[i])
+            last_pos = self._last_positions[i]
+            
+            # Calculate progress (simple euclidean distance moved)
+            progress = np.sqrt((current_pos[0] - last_pos[0])**2 + (current_pos[1] - last_pos[1])**2)
+            
+            # Reward components:
+            # 1. Progress reward (encourage forward movement)
+            progress_reward = progress * 10.0  # Scale progress
+            # 2. Collision penalty
+            collision_penalty = 100.0 if self.env.collisions[i] else 0.0
+            # 3. Small baseline reward for staying alive
+            survival_reward = 0.1
+            
+            reward = progress_reward + survival_reward - collision_penalty
             rewards.append(reward)
-            self._last_positions[i] = pos
+            self._last_positions[i] = current_pos
 
         obs_dict = self._convert_obs(obs)
         rew_dict = {agent: rewards[i] for i, agent in enumerate(self.agents)}
