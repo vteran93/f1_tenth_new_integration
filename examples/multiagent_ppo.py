@@ -34,12 +34,13 @@ class MultiAgentF110(MultiAgentEnv):
     """Simplified multi-agent wrapper for F110Env."""
 
     def __init__(self, env_config=None):
+        super().__init__()
         self.env = F110Env(config=env_config or {}, render_mode=env_config.get("render_mode"))
         self.agents = [f"agent_{i}" for i in range(self.env.num_agents)]
         self._last_positions = [(0.0, 0.0)] * self.env.num_agents
         
         # Extract single agent spaces from multi-agent F110Env
-        self.action_space = gym.spaces.Box(low=np.array([-1.0, 0.0]), high=np.array([1.0, 10.0]), dtype=np.float32)
+        self.action_space = self._make_single_agent_action_space()
         self.observation_space = self._make_single_agent_obs_space()
 
     def _make_single_agent_obs_space(self):
@@ -135,6 +136,27 @@ class MultiAgentF110(MultiAgentEnv):
 
     def close(self):
         self.env.close()
+
+    def _make_single_agent_action_space(self):
+        """Extract single agent action space from F110Env's multi-agent action space."""
+        # F110Env action space is (num_agents, action_dim) 
+        # We extract the first agent's action space bounds
+        multi_action_space = self.env.action_space
+        
+        # Ensure it's a Box space as expected
+        if not isinstance(multi_action_space, gym.spaces.Box):
+            raise ValueError(f"Expected Box action space, got {type(multi_action_space)}")
+        
+        # Extract single agent bounds from multi-agent space
+        single_low = multi_action_space.low[0]  # First agent's lower bounds
+        single_high = multi_action_space.high[0]  # First agent's upper bounds
+        
+        return gym.spaces.Box(
+            low=single_low, 
+            high=single_high, 
+            shape=single_low.shape, 
+            dtype=np.float32
+        )
 
 
 def get_env_config(render_mode=None):
@@ -264,7 +286,7 @@ def setup_evaluation():
     eval_env = MultiAgentF110(get_env_config(render_mode="human"))
     
     for episode in range(3):
-        obs_dict, _ = eval_env.reset(seed=42)
+        obs_dict, _ = eval_env.reset(seed=episode)
         done = False
         step_count = 0
         
