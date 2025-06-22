@@ -14,11 +14,13 @@ import os
 import time
 import argparse
 from ray.tune.registry import register_env
+from ray import tune
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from ray.rllib.policy.policy import PolicySpec
 from ray.rllib.algorithms.ppo import PPOConfig
 from f1tenth_gym.envs import F110Env
 from enum import Enum
+import torch
 
 # Fix for gymnasium compatibility with RLlib
 import gymnasium.envs.registration
@@ -38,6 +40,7 @@ class MultiAgentF110(MultiAgentEnv):
         self.env = F110Env(config=env_config or {}, render_mode=env_config.get("render_mode"))
         self.agents = [f"agent_{i}" for i in range(self.env.num_agents)]
         self._last_positions = [(0.0, 0.0)] * self.env.num_agents
+        self._crashed_agents = set()  # Track which agents have crashed
         
         # Extract single agent spaces from multi-agent F110Env
         self.action_space = self._make_single_agent_action_space()
@@ -95,41 +98,107 @@ class MultiAgentF110(MultiAgentEnv):
     def reset(self, *, seed=None, options=None):
         obs, info = self.env.reset(seed=seed, options=options)
         self._last_positions = [(self.env.poses_x[i], self.env.poses_y[i]) for i in range(self.env.num_agents)]
+        self._crashed_agents = set()  # Reset crashed agents
         return self._convert_obs(obs), {agent: info for agent in self.agents}
 
     def step(self, action_dict):
-        actions = np.array([action_dict[agent] for agent in self.agents])
+        # Filter actions: crashed agents get zero action
+        filtered_actions = []
+        for i, agent in enumerate(self.agents):
+            if agent in self._crashed_agents:
+                # Crashed agent gets zero action (no movement)
+                filtered_actions.append(np.zeros_like(self.env.action_space.low[0]))
+            else:
+                filtered_actions.append(action_dict.get(agent, np.zeros_like(self.env.action_space.low[0])))
+        
+        actions = np.array(filtered_actions)
         obs, _, terminated, truncated, info = self.env.step(actions)
 
-        # Progress-based reward with collision penalty
-        rewards = []
+        # Track newly crashed agents this step
+        newly_crashed = set()
         for i in range(self.env.num_agents):
-            current_pos = (self.env.poses_x[i], self.env.poses_y[i])
-            last_pos = self._last_positions[i]
-            
-            # Calculate progress (simple euclidean distance moved)
-            progress = np.sqrt((current_pos[0] - last_pos[0])**2 + (current_pos[1] - last_pos[1])**2)
-            
-            # Reward components:
-            # 1. Progress reward (encourage forward movement)
-            progress_reward = progress * 10.0  # Scale progress
-            # 2. Collision penalty
-            collision_penalty = 100.0 if self.env.collisions[i] else 0.0
-            # 3. Small baseline reward for staying alive
-            survival_reward = 0.1
-            
-            reward = progress_reward + survival_reward - collision_penalty
-            rewards.append(reward)
-            self._last_positions[i] = current_pos
+            agent = self.agents[i]
+            if self.env.collisions[i] and agent not in self._crashed_agents:
+                newly_crashed.add(agent)
+                self._crashed_agents.add(agent)
 
-        obs_dict = self._convert_obs(obs)
-        rew_dict = {agent: rewards[i] for i, agent in enumerate(self.agents)}
-        terminated_dict = {agent: terminated for agent in self.agents}
-        terminated_dict["__all__"] = terminated
-        truncated_dict = {agent: truncated for agent in self.agents}
+        
+        # Calculate rewards
+        rewards = self._get_rewards(newly_crashed)
+
+        # Convert observations
+        full_obs_dict = self._convert_obs(obs)
+        
+        # Build return dictionaries - only include active agents in obs
+        obs_dict = {}
+        rew_dict = {}
+        terminated_dict = {}
+        
+        for i, agent in enumerate(self.agents):
+            if agent not in self._crashed_agents:
+                # Agent is still active
+                obs_dict[agent] = full_obs_dict[agent]
+                rew_dict[agent] = rewards[i]
+                terminated_dict[agent] = False
+            elif agent in newly_crashed:
+                # Agent just crashed this step - include final observation and reward
+                obs_dict[agent] = full_obs_dict[agent]
+                rew_dict[agent] = rewards[i]
+                terminated_dict[agent] = True
+            # Note: Previously crashed agents are not included in any dict
+
+        # Episode ends when ALL agents have crashed
+        terminated_dict["__all__"] = len(self._crashed_agents) == len(self.agents)
+        
+        # Truncated dict only for active/newly crashed agents
+        truncated_dict = {agent: truncated for agent in obs_dict.keys()}
         truncated_dict["__all__"] = truncated
         
-        return obs_dict, rew_dict, terminated_dict, truncated_dict, {agent: info for agent in self.agents}
+        # Info dict only for active/newly crashed agents
+        info_dict = {agent: info for agent in obs_dict.keys()}
+        
+        return obs_dict, rew_dict, terminated_dict, truncated_dict, info_dict
+
+    def _get_rewards(self, newly_crashed):
+        """Calculate individual rewards for each agent based on F110Env reward function."""
+        
+        # Initialize last_s tracking if not exists (track progress for each agent)
+        if not hasattr(self, '_last_s'):
+            self._last_s = [0.0] * self.env.num_agents
+
+        rewards = []
+        for i in range(self.env.num_agents):
+            agent = self.agents[i]
+            
+            if agent in self._crashed_agents and agent not in newly_crashed:
+                # Agent was already crashed - no reward calculation needed
+                reward = 0.0
+            else:
+                # Calculate track progress using centerline spline (from F110Env)
+                current_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
+                    self.env.poses_x[i], self.env.poses_y[i]
+                )
+
+                # Calculate progress since last step
+                prog = current_s - self._last_s[i]
+                
+                # Handle lap completion (when current_s wraps around to beginning)
+                if prog > 0.9 * self.env.track.centerline.spline.s[-1]:
+                    prog = (self.env.track.centerline.spline.s[-1] - self._last_s[i]) + current_s
+                
+                # Start with progress reward (main component from F110Env)
+                reward = prog
+                
+                # Apply collision penalty (from F110Env)
+                if agent in newly_crashed:  # Only penalize when agent crashes this step
+                    reward -= 1.0
+                
+                # Update last track position for this agent
+                self._last_s[i] = current_s
+            
+            rewards.append(reward)
+        
+        return rewards
 
     def render(self):
         return self.env.render()
@@ -190,8 +259,9 @@ def setup_policies_and_config():
               .framework("torch")
               .api_stack(enable_rl_module_and_learner=False, enable_env_runner_and_connector_v2=False)
               .env_runners(num_env_runners=0)
-              .multi_agent(policies=policies, policy_mapping_fn=lambda agent_id, *args, **kwargs: agent_id))
-    
+              .multi_agent(policies=policies, policy_mapping_fn=lambda agent_id, *args, **kwargs: agent_id)
+              .training(train_batch_size=4000)
+            )
     return policies, config
 
 
@@ -239,16 +309,15 @@ def setup_training():
     algo = setup_ray_and_algo(config)
     
     # Training loop
-    TOTAL_TIMESTEPS = 20_000
-    SAVE_EVERY = 200
+    TOTAL_TIMESTEPS = 500_000
     
     while True:
         result = algo.train()
         timesteps_total = result['timesteps_total']
         
-        if timesteps_total % SAVE_EVERY == 0:
-            print(f"Timesteps: {timesteps_total}")
-            algo.save(model_dir)
+        
+        print(f"Timesteps: {timesteps_total}")
+        algo.save(model_dir)
             
         if timesteps_total >= TOTAL_TIMESTEPS:
             break
