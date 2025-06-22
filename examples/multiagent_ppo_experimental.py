@@ -257,7 +257,7 @@ class geminiReward(MultiAgentF110):
                 reward = 0.0
             else:
                 # Calculate track progress using centerline spline
-                current_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
+                current_s, _ = self.env.track.raceline.spline.calc_arclength_inaccurate(
                     self.env.poses_x[i], self.env.poses_y[i]
                 )
 
@@ -302,7 +302,7 @@ def get_env_config(render_mode=None):
         "integrator": "rk4",
         "control_input": ["speed", "steering_angle"],
         "observation_config": {"type": "original"},
-        "reset_config": {"type": "rl_random_static"},
+        "reset_config": {"type": "rl_grid_static"},
         "render_mode": render_mode,
     }
 
@@ -336,21 +336,16 @@ def custom_log_creator(custom_path: str, prefix: str):
     """
     def logger_creator(config):
         os.makedirs(custom_path, exist_ok=True)
-        # Create a unique subfolder per run
-        run_dir = tempfile.mkdtemp(
-            prefix=f"{prefix}_{datetime.now():%Y%m%d_%H%M%S}_",
-            dir=custom_path
-        )
-        return UnifiedLogger(config, run_dir, loggers=None)
+        # The run_dir is now the custom_path itself, no extra timestamped subfolder
+        return UnifiedLogger(config, custom_path, loggers=None)
     return logger_creator
 
 
-def setup_ray_and_algo(config):
+def setup_ray_and_algo(config, run_name):
     """Initialize Ray and build algorithm—with TensorBoard logging."""
     ray.init(ignore_reinit_error=True)
-    # Create a per-run log directory
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = os.path.abspath(f"runs/multiagent_ppo_{timestamp}")
+    # Create a per-run log directory using the run_name
+    log_dir = os.path.abspath(f"runs/{run_name}")
     os.makedirs(log_dir, exist_ok=True)
 
     # Build with a custom logger_creator to dump TB event files there
@@ -359,33 +354,80 @@ def setup_ray_and_algo(config):
     )
 
 
-def setup_training():
-    """Setup and run training."""
+def setup_training(resume_from=None):
+    """Setup and run training, with optional resume from a checkpoint."""
     print("Starting training...")
+
+    model_dir = None
+    run_name = None
+
+    # Determine model directory for saving and restoring
+    if resume_from:
+        models_dir = "models"
+        if resume_from is True:  # --resume without path, find latest
+            print("Attempting to resume from the latest model...")
+            if not os.path.exists(models_dir) or not os.listdir(models_dir):
+                print("No models directory found or it's empty. Starting a new training run.")
+            else:
+                # Find all compatible run directories
+                run_dirs = [d for d in os.listdir(models_dir) if d.startswith("multiagent_ppo_") and os.path.isdir(os.path.join(models_dir, d))]
+                if not run_dirs:
+                    print("No compatible models found to resume from. Starting a new training run.")
+                else:
+                    # The timestamp is at the beginning of the name suffix, so lexicographical sort works
+                    latest_model_dir_name = max(run_dirs)
+                    model_dir = os.path.abspath(os.path.join(models_dir, latest_model_dir_name))
+        else:  # --resume with a path
+            model_dir = os.path.abspath(resume_from)
+            if not os.path.exists(model_dir):
+                print(f"Specified model path does not exist: {model_dir}. Starting a new training run.")
+                model_dir = None  # Reset to start fresh
     
-    # Setup
-    timestamp = str(int(time.time()))
-    model_dir = f"models/multiagent_ppo_run_{timestamp}"
-    os.makedirs(model_dir, exist_ok=True)
-    
+    # If resuming, get run_name from model_dir
+    if model_dir:
+        run_name = os.path.basename(model_dir)
+
+    # If not resuming or resume path not found, create a new directory
+    if not model_dir:
+        env_config = get_env_config()
+        reset_config = env_config["reset_config"]
+        env_class_name = geminiReward.__name__
+        date_str = datetime.now().strftime("%Y%m%d%H%M%S")
+        run_name = f"multiagent_ppo_{date_str}_{reset_config}_{env_class_name}"
+        
+        model_dir = f"models/{run_name}"
+        os.makedirs(model_dir, exist_ok=True)
+        print(f"Starting new training run. Models will be saved to: {model_dir}")
+    else:
+        print(f"Resuming training. Models will be saved to existing directory: {model_dir}")
+
     # Setup policies and config
     policies, config = setup_policies_and_config()
-    algo = setup_ray_and_algo(config)
-    
+    algo = setup_ray_and_algo(config, run_name)
+
+    # Restore if we are resuming from an existing directory
+    if resume_from and model_dir and os.path.exists(model_dir):
+        try:
+            # RLLib's restore can take the directory and finds the latest checkpoint
+            algo.restore(model_dir)
+            print(f"Successfully restored model from {model_dir}")
+        except Exception as e:
+            print(f"Could not restore model from {model_dir}. Training will start from scratch and overwrite. Error: {e}")
+
     # Training loop
-    TOTAL_TIMESTEPS = 500_000
-    
+    TOTAL_TIMESTEPS = 1_000_000
+
     while True:
         result = algo.train()
         timesteps_total = result['timesteps_total']
-        
-        
+
         print(f"Timesteps: {timesteps_total}")
+        # Save to the determined model directory
         algo.save(model_dir)
-            
+
         if timesteps_total >= TOTAL_TIMESTEPS:
             break
-    
+
     final_checkpoint = algo.save(model_dir)
     print(f"Training completed. Model saved to {final_checkpoint}")
     algo.stop()
@@ -401,18 +443,20 @@ def setup_evaluation():
         print("No models directory found. Train a model first.")
         return
         
-    run_dirs = [d for d in os.listdir(models_dir) if d.startswith("multiagent_ppo_run_")]
+    # Find all compatible run directories
+    run_dirs = [d for d in os.listdir(models_dir) if d.startswith("multiagent_ppo_") and os.path.isdir(os.path.join(models_dir, d))]
     if not run_dirs:
         print("No trained models found. Train a model first.")
         return
     
-    latest_model = max(run_dirs, key=lambda x: int(x.split("_")[-1]))
+    # The timestamp is at the beginning of the name suffix, so lexicographical sort works
+    latest_model = max(run_dirs)
     model_path = os.path.abspath(os.path.join(models_dir, latest_model))
     print(f"Using model: {latest_model}")
     
     # Setup algorithm
     policies, config = setup_policies_and_config()
-    algo = setup_ray_and_algo(config)
+    algo = setup_ray_and_algo(config, latest_model)
     algo.restore(model_path)
     
     # Run evaluation
@@ -440,10 +484,12 @@ def setup_evaluation():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="F1TENTH Multi-Agent RL Training/Evaluation")
     parser.add_argument("--train", action="store_true", help="Run training mode instead of evaluation")
+    parser.add_argument("--resume", nargs='?', const=True, default=None,
+                        help="Resume training from the latest checkpoint, or a specific one if a path is provided.")
     args = parser.parse_args()
     
     if args.train:
-        setup_training()
+        setup_training(resume_from=args.resume)
     else:
         setup_evaluation()
     
