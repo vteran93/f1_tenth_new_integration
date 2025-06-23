@@ -3,8 +3,8 @@ import time
 from typing import Dict
 import yaml
 import numpy as np
-import torch
 import ray
+import torch
 from ray.rllib.algorithms import ppo, sac
 from ray.rllib.algorithms.algorithm import Algorithm
 from ray.tune.registry import register_env
@@ -13,6 +13,7 @@ from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from f1tenth_gym.envs import F110Env
 from rewards import RacePerformanceReward, CrossTrackHeadReward
 import gymnasium as gym
+
 
 class MultiAgentF110(MultiAgentEnv):
     def __init__(self, config: Dict):
@@ -23,7 +24,7 @@ class MultiAgentF110(MultiAgentEnv):
         self._possible_agents = self._agents
         self._observation_space = None  # Inicializar como None, se definirá después
         self._action_space = None      # Inicializar como None, se definirá después
-        
+
         super().__init__()  # Llamar a super().__init__ después de inicializar agentes
 
         print(f"MultiAgentF110: Initializing with config: {config}")
@@ -32,8 +33,12 @@ class MultiAgentF110(MultiAgentEnv):
         self.render_interval = config["training"].get("render_interval", 200)
         self.step_count = 0
         self.episode_step_count = 0
-        # Forzar render_mode=None inicialmente y controlarlo manualmente
-        self.env = F110Env(config=env_config or {}, render_mode=None)
+        # Set render mode based on config
+        render_mode = None
+        if config.get("mode") == "eval":
+            render_mode = "human"
+            print("Setting render mode to 'human' for evaluation")
+        self.env = F110Env(config=env_config or {}, render_mode=render_mode)
         self.num_beams = env_config.get("num_beams", 5)  # Valor por defecto
         self._observation_space = {
             agent_id: gym.spaces.Box(low=-np.inf, high=np.inf, shape=(self.num_beams + 3,), dtype=np.float32)
@@ -55,7 +60,9 @@ class MultiAgentF110(MultiAgentEnv):
         self.episode_rewards = {agent_id: 0.0 for agent_id in self._agents}
         print(f"Action space: {self._action_space}")
         print(f"Observation space: {self._observation_space}")
-        print(f"Render training: {self.render_training}, Render interval: {self.render_interval}, Mode: {config.get('mode')}")
+        print(f"Render mode set to: {render_mode}")
+        print(
+            f"Render training: {self.render_training}, Render interval: {self.render_interval}, Mode: {config.get('mode')}")
 
     @property
     def agents(self):
@@ -109,9 +116,6 @@ class MultiAgentF110(MultiAgentEnv):
         for agent_id in self._agents:
             positions = [(obs['poses_x'][i], obs['poses_y'][i]) for i in range(len(self._agents))]
             self.reward_fn[agent_id].reset(positions)
-        if self.config.get("mode") == "eval" and self.config.get("environment", {}).get("render_mode") == "human":
-            print("Rendering reset (manual)")
-            self.env.render()
         return obs_dict, info_dict
 
     def step(self, action_dict):
@@ -120,9 +124,11 @@ class MultiAgentF110(MultiAgentEnv):
         actions = np.zeros((len(self._agents), 2), dtype=np.float32)
         for i, agent_id in enumerate(self._agents):
             actions[i] = action_dict[agent_id]
-            print(f"Agent {agent_id} action: speed={action_dict[agent_id][0]:.2f}, steering={action_dict[agent_id][1]:.2f}")
+            print(
+                f"Agent {agent_id} action: speed={action_dict[agent_id][0]:.2f}, steering={action_dict[agent_id][1]:.2f}")
         obs, _, terminated, truncated, info = self.env.step(actions)
-        print(f"Step obs: poses_x={obs['poses_x']}, poses_y={obs['poses_y']}, poses_theta={obs['poses_theta']}, collisions={obs['collisions']}, lap_counts={obs['lap_counts']}")
+        print(
+            f"Step obs: poses_x={obs['poses_x']}, poses_y={obs['poses_y']}, poses_theta={obs['poses_theta']}, collisions={obs['collisions']}, lap_counts={obs['lap_counts']}")
         print(f"Step info: {info}")
         rew_dict = {}
         obs_dict = {}
@@ -160,19 +166,23 @@ class MultiAgentF110(MultiAgentEnv):
         truncated_dict["__all__"] = truncated
         info_dict = {agent_id: info for agent_id in self._agents}
         info_dict["__common__"] = {"episode_rewards": self.episode_rewards}
-        print(f"Env state: terminated={terminated}, truncated={truncated}, episode_steps={self.episode_step_count}, lap_counts={obs['lap_counts']}, episode_rewards={self.episode_rewards}")
+        print(
+            f"Env state: terminated={terminated}, truncated={truncated}, episode_steps={self.episode_step_count}, lap_counts={obs['lap_counts']}, episode_rewards={self.episode_rewards}")
         if terminated or truncated:
-            print(f"Episode terminated or truncated: terminated={terminated}, truncated={truncated}, episode_steps={self.episode_step_count}, lap_counts={obs['lap_counts']}, poses_x={obs['poses_x']}, poses_y={obs['poses_y']}, info={info}, total_rewards={self.episode_rewards}")
+            print(
+                f"Episode terminated or truncated: terminated={terminated}, truncated={truncated}, episode_steps={self.episode_step_count}, lap_counts={obs['lap_counts']}, poses_x={obs['poses_x']}, poses_y={obs['poses_y']}, info={info}, total_rewards={self.episode_rewards}")
             self.episode_rewards = {agent_id: 0.0 for agent_id in self._agents}
-        if self.config.get("mode") == "eval" and self.config.get("environment", {}).get("render_mode") == "human":
-            print("Rendering step (manual)")
-            self.env.render()
         return obs_dict, rew_dict, terminated_dict, truncated_dict, info_dict
+
+    def render(self):
+        """Render the environment."""
+        return self.env.render()
 
     def close(self):
         if hasattr(self.env, 'close'):
             print("Closing environment")
             self.env.close()
+
 
 def custom_log_creator(log_dir):
     def logger_creator(config):
@@ -180,6 +190,7 @@ def custom_log_creator(log_dir):
             os.makedirs(log_dir)
         return UnifiedLogger(config, log_dir, loggers=None)
     return logger_creator
+
 
 def setup_policies_and_config(config: Dict) -> tuple:
     print(f"setup_policies_and_config: Creating temp_env with config={config}")
@@ -193,24 +204,25 @@ def setup_policies_and_config(config: Dict) -> tuple:
         algo_config = config["algorithm"]["agents"][agent_id]
         algo_type = algo_config.pop("type")
         if algo_type == "ppo":
-            ppo_config = ppo.PPOConfig().environment(env="f110_multi").env_runners(num_env_runners=2).resources(num_gpus=0).framework("torch")
+            ppo_config = ppo.PPOConfig().environment(env="f110_multi").env_runners(
+                num_env_runners=2).resources(num_gpus=0).framework("torch")
             ppo_config.sgd_minibatch_size = 128
             ppo_config = ppo_config.training(**algo_config)
             algorithms[agent_id] = ppo_config
         elif algo_type == "sac":
-            sac_config = sac.SACConfig().environment(env="f110_multi").env_runners(num_env_runners=2).resources(num_gpus=0).framework("torch")
+            sac_config = sac.SACConfig().environment(env="f110_multi").env_runners(
+                num_env_runners=2).resources(num_gpus=0).framework("torch")
             sac_config = sac_config.training(**algo_config)
             algorithms[agent_id] = sac_config
     return policies, algorithms
+
 
 def setup_training(config: Dict):
     print(f"Config mode: {config['mode']}")  # Depuración
     print(f"Checkpoint path: {config.get('checkpoint_path', 'No checkpoint specified')}")
     ray.init(ignore_reinit_error=True)
     print("Ray initialized")
-    
-    
-    
+
     # Pasar config completo al entorno registrado
     register_env("f110_multi", lambda env_config: MultiAgentF110(env_config))
     print("Environment registered")
@@ -229,8 +241,7 @@ def setup_training(config: Dict):
     algo_config = algo_config.resources(num_gpus=0)
     algo_config = algo_config.environment(env="f110_multi", env_config=config)
     algo_config = algo_config.reporting(keep_per_episode_custom_metrics=True)
-    
-   
+
     if config["mode"] == "eval":
         checkpoint_path = os.path.abspath(config["checkpoint_path"])
         algo = algo_config.build(logger_creator=custom_log_creator(log_dir))
@@ -241,8 +252,107 @@ def setup_training(config: Dict):
             print(f"Failed to restore checkpoint: {str(e)}")
             exit(1)  # Exit if restoration fails
             raise
-        
-        
+
+        # Run evaluation with proper rendering
+        print("Starting evaluation...")
+        evaluation_config = config.get("evaluation", {})
+        num_episodes = evaluation_config.get("num_episodes", 3)
+        max_steps = evaluation_config.get("max_steps_per_episode", 100000)
+
+        # Create evaluation environment with human rendering
+        eval_config = config.copy()
+        eval_config["environment"]["render_mode"] = "human"
+        eval_config["mode"] = "eval"  # Ensure eval mode
+        eval_env = MultiAgentF110(eval_config)
+
+        print(f"Created evaluation environment with render_mode: {eval_env.env.render_mode}")
+
+        for episode in range(num_episodes):
+            print(f"Starting episode {episode + 1}")
+            obs_dict, _ = eval_env.reset(seed=episode)
+            done = False
+            step_count = 0
+            episode_rewards = {agent_id: 0.0 for agent_id in eval_env.agents}
+
+            while not done and step_count < max_steps:
+                # Use the new RLModule API for inference
+                action_dict = {}
+                for agent_id, obs in obs_dict.items():
+                    # Get the RLModule for this agent
+                    rl_module = algo.get_module(agent_id)
+
+                    # Convert observation to tensor format
+                    obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)  # Add batch dimension
+
+                    # Forward inference
+                    with torch.no_grad():
+                        results = rl_module.forward_inference({"obs": obs_tensor})
+
+                        # Debug: print results structure for first agent and first step
+                        if step_count == 0 and agent_id == 'agent_0':
+                            print(f"Debug - RLModule forward_inference results keys: {list(results.keys())}")
+                            for key, value in results.items():
+                                if hasattr(value, 'shape'):
+                                    print(f"Debug - {key} shape: {value.shape}")
+                                else:
+                                    print(f"Debug - {key} type: {type(value)}")
+
+                        # Extract action from results
+                        if "actions" in results:
+                            action = results["actions"][0].numpy()  # Remove batch dimension and convert to numpy
+                        elif "action" in results:
+                            action = results["action"][0].numpy()
+                        else:
+                            # Sometimes the output key might be different
+                            action_key = [k for k in results.keys() if "action" in k.lower()][0]
+                            action = results[action_key][0].numpy()
+
+                        # Debug: print action shape
+                        if step_count == 0:
+                            print(f"Debug - Agent {agent_id} action shape: {action.shape}, action: {action}")
+
+                        # Make sure action has the right shape (2,) for [speed, steering]
+                        if len(action.shape) > 1:
+                            action = action.flatten()
+                        if action.shape[0] > 2:
+                            # Take only the first 2 elements if there are more
+                            action = action[:2]
+
+                    action_dict[agent_id] = action
+
+                # Step environment
+                obs_dict, rew_dict, terminated_dict, truncated_dict, _ = eval_env.step(action_dict)
+
+                # Render the environment
+                try:
+                    eval_env.render()
+                except Exception as e:
+                    print(f"Render warning: {e}")
+
+                # Update episode rewards
+                for agent_id in eval_env.agents:
+                    episode_rewards[agent_id] += rew_dict.get(agent_id, 0.0)
+
+                # Check if episode is done
+                done = terminated_dict["__all__"] or truncated_dict["__all__"]
+                step_count += 1
+
+                # Add delay for better visualization
+                time.sleep(0.05)
+
+                # Print progress every 100 steps
+                if step_count % 100 == 0:
+                    print(f"Episode {episode + 1}, Step {step_count}, Rewards: {episode_rewards}")
+
+            print(f"Episode {episode + 1} completed in {step_count} steps")
+            print(f"Episode rewards: {episode_rewards}")
+
+        eval_env.close()
+        algo.stop()
+        ray.shutdown()
+        print("Evaluation completed")
+        return
+
     else:
         algo = algo_config.build(logger_creator=custom_log_creator(log_dir))
         print("Algorithm built")
@@ -267,13 +377,15 @@ def setup_training(config: Dict):
                         print(f"Policy {agent_id} reward mean: {result[f'policy_{agent_id}_reward_mean']:.2f}")
                         per_agent_rewards[agent_id] = result[f'policy_{agent_id}_reward_mean']
                     elif f"env_runners/agent_episode_returns_mean/{agent_id}" in result:
-                        print(f"Agent {agent_id} episode returns mean: {result[f'env_runners/agent_episode_returns_mean/{agent_id}']:.2f}")
+                        print(
+                            f"Agent {agent_id} episode returns mean: {result[f'env_runners/agent_episode_returns_mean/{agent_id}']:.2f}")
                         per_agent_rewards[agent_id] = result[f'env_runners/agent_episode_returns_mean/{agent_id}']
                     else:
                         per_agent_rewards[agent_id] = 0.0
                 episode_reward_mean = result.get("episode_reward_mean", 0.0)
                 timesteps = result.get("timesteps_total", result.get("training_iteration", 0))
-                print(f"Iteration: {iteration}, Timesteps/Iteration: {timesteps}, Per-Agent Rewards: {per_agent_rewards}, Avg Episode Reward: {episode_reward_mean:.2f}")
+                print(
+                    f"Iteration: {iteration}, Timesteps/Iteration: {timesteps}, Per-Agent Rewards: {per_agent_rewards}, Avg Episode Reward: {episode_reward_mean:.2f}")
                 if episode_reward_mean > best_metric and episode_reward_mean > save_best_threshold:
                     best_metric = episode_reward_mean
                     checkpoint_path = os.path.join(model_dir, "best")
@@ -305,7 +417,9 @@ def setup_training(config: Dict):
         print("Stopping algorithm")
         ray.shutdown()
         print("Ray shutdown")
-""" 
+
+
+"""
 def setup_training(config: Dict):
     print(f"Config mode: {config['mode']}")  # Depuración: confirmar modo
     print(f"Checkpoint path: {config.get('checkpoint_path', 'No checkpoint specified')}")  # Depuración: confirmar ruta del checkpoint
@@ -434,8 +548,8 @@ def setup_training(config: Dict):
             ray.shutdown()
             print("Ray shutdown")
 """
-            
-            
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()

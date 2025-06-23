@@ -1,7 +1,7 @@
 # Configuración general del modo de ejecución
 mode: eval  # Cambiar a 'eval' para evaluar un modelo entrenado; 'train' para reentrenar desde cero
 #checkpoint_path: /home/pepe/Desarrollo/f1_tenth_new_integration-ray-sergio/f1_tenth_new_integration-ray-sergio/examples/models/multiagent_run_1750609088/final/checkpoint-200
-checkpoint_path: /home/pepe/Desarrollo/f1_tenth_new_integration-ray-sergio/f1_tenth_new_integration-ray-sergio/examples/models/multiagent_run_1750671239/final
+checkpoint_path: models/multiagent_run_1750671239/final
 
 # Configuración del entorno de simulación
 environment:
