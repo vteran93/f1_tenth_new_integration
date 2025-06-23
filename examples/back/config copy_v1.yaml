@@ -1,0 +1,96 @@
+# Configuración para el simulador F1TENTH multiagente y entrenamiento/evaluación de RL
+# Este archivo define el entorno, las recompensas, el algoritmo de aprendizaje por refuerzo,
+# y los parámetros de entrenamiento/evaluación. Los comentarios explican cada sección y parámetro.
+
+# Modo de ejecución
+mode: "eval"
+
+# Configuración del entorno F1TENTH
+environment:
+  map: "Spielberg"  # Nombre del mapa de la pista. Carga "../maps/Spielberg/Spielberg_raceline.csv" para definir la línea de carrera.
+  num_agents: 1  # Número de agentes (coches) en la simulación. 1 agente para pruebas individuales.
+  timestep: 0.01  # Intervalo de tiempo entre pasos de simulación (en segundos). Afecta la dinámica física.
+  num_beams: 36  # Número de rayos en el escaneo LIDAR. 36 proporciona suficiente resolución con bajo costo computacional.
+  integrator: "rk4"  # Método de integración para la simulación física. "rk4" (Runge-Kutta 4) es más preciso que "euler".
+  control_input:  # Entradas de control que los agentes pueden ajustar.
+    - "speed"  # Velocidad lineal del coche (en m/s).
+    - "steering_angle"  # Ángulo de dirección (en radianes).
+  observation_config:  # Configuración de las observaciones que reciben los agentes.
+    type: "original"  # Tipo de observación. "original" incluye escaneos LIDAR, posición, orientación, y velocidad.
+  reset_config:  # Configuración para reiniciar el entorno al comienzo de cada episodio.
+    type: "rl_random_static"  # Reinicio aleatorio pero estático para RL, coloca el coche en posiciones iniciales variadas.
+  render_mode: "train"
+
+# Configuración de la estrategia de recompensa
+reward:
+  strategy: "raceperformance"  # Estrategia de recompensa utilizada. "raceperformance" mide el rendimiento en la carrera.
+  raceperformance:
+    progress_scale: 15.0       # Recompensa por distancia recorrida
+    speed_scale: 5.0           # Recompensa por velocidad
+    collision_penalty: 350.0    # Penalización fuerte por colisión #original 200
+    overtake_bonus: 50.0       # Bonus por adelantar otro coche
+    stall_penalty: 10.0        # Penalización por velocidad muy baja
+    jerk_penalty: 4.0          # Penalización por cambios bruscos de dirección oRIGINAL 2
+    min_speed_threshold: 1.0   # Velocidad mínima para considerar "parado" 0.5 ORIGINAL
+  progress:  # Configuración para la recompensa basada en el progreso a lo largo de la pista.
+    progress_scale: 10.0  # Factor de escala para la recompensa por avanzar (en metros). Fomenta completar la vuelta.
+    base_reward: 0.1  # Recompensa base por cada paso (incentiva supervivencia).
+    collision_penalty: 100.0  # Penalización por colisión (valor negativo restado de la recompensa).
+  speed_track:  # Configuración para la recompensa basada en seguir una velocidad de referencia.
+    speed_scale: 5.0  # Factor de escala para la recompensa por acercarse a la velocidad objetivo.
+    track_deviation_penalty: 2.0  # Penalización por desviarse de la trayectoria de referencia.
+    collision_penalty: 100.0  # Penalización por colisión, igual que en otras estrategias.
+  crosstrack:  # Configuración para la recompensa basada en minimizar errores de trayectoria y orientación.
+    map_path: "../maps/Spielberg/Spielberg_raceline.csv"  # Ruta al CSV con la línea de carrera (usado por PurePursuitPlanner).
+    lookahead_distance: 1.5  # Distancia de anticipación (en metros) para el controlador Pure Pursuit.
+    wheelbase: 0.33  # Distancia entre ejes del coche (en metros), usada para calcular la dirección.
+    max_steer: 0.5  # Ángulo máximo de dirección (en radianes), limita las acciones del controlador.
+    cte_scale: 3.0  # Factor de escala para el error de trayectoria (cross-track error, distancia al waypoint).
+    he_scale: 2.0  # Factor de escala para el error de orientación (heading error, diferencia angular).
+    max_cte: 2.0  # Error de trayectoria máximo (en metros) para normalizar la penalización.
+    max_he: 0.7854  # Error de orientación máximo (en radianes, equivalente a 45°), para normalizar.
+    collision_penalty: 100.0  # Penalización por colisión, consistente con otras estrategias.
+  talearning:  # Configuración para una estrategia de recompensa personalizada (posiblemente un experimento).
+    map_path: "../maps/Spielberg/Spielberg_raceline.csv"  # Ruta al CSV, igual que en crosstrack.
+    lookahead_distance: 1.5  # Distancia de anticipación, igual que en crosstrack.
+    wheelbase: 0.33  # Distancia entre ejes, igual que en crosstrack.
+    max_steer: 0.5  # Ángulo máximo de dirección, igual que en crosstrack.
+    steer_scale: 10.0  # Factor de escala para la recompensa basada en la dirección.
+    speed_scale: 5.0  # Factor de escala para la recompensa basada en la velocidad.
+    collision_penalty: 100.0  # Penalización por colisión, igual que en otras estrategias.
+
+# Configuración del algoritmo de RL
+algorithm:
+  type: "ppo"  # Algoritmo de aprendizaje por refuerzo activo. "ppo" (Proximal Policy Optimization) es robusto para este entorno.
+  ppo:  # Hiperparámetros específicos para PPO.
+    learning_rate: 0.001  # Tasa de aprendizaje para la optimización de la red neuronal.
+    gamma: 0.98  # Factor de descuento para recompensas futuras, prioriza recompensas a largo plazo.
+    train_batch_size: 4000  # Tamaño del lote para las actualizaciones del modelo, grande para estabilidad.
+  sac:  # Hiperparámetros para SAC (Soft Actor-Critic), no activo actualmente.
+    learning_rate: 0.0003  # Tasa de aprendizaje.
+    gamma: 0.99  # Factor de descuento.
+    train_batch_size: 256  # Tamaño del lote, más pequeño que PPO.
+    tau: 0.005  # Tasa de actualización suave para las redes objetivo.
+  ddpg:  # Hiperparámetros para DDPG (Deep Deterministic Policy Gradient), no activo.
+    learning_rate: 0.0001  # Tasa de aprendizaje, más baja para estabilidad.
+    gamma: 0.99  # Factor de descuento.
+    train_batch_size: 128  # Tamaño del lote.
+    tau: 0.002  # Tasa de actualización suave.
+  td3:  # Hiperparámetros para TD3 (Twin Delayed DDPG), no activo.
+    learning_rate: 0.0001  # Tasa de aprendizaje.
+    gamma: 0.99  # Factor de descuento.
+    train_batch_size: 128  # Tamaño del lote.
+    tau: 0.002  # Tasa de actualización suave.
+    target_noise: 0.2  # Ruido añadido a las acciones objetivo para exploración.
+    noise_clip: 0.5  # Límite para el ruido en las acciones objetivo.
+
+# Configuración del entrenamiento
+training:
+  total_timesteps: 1500000
+  save_every: 200  # Frecuencia (en pasos) para guardar puntos de control del modelo.
+
+# Configuración de la evaluación
+evaluation:
+  num_episodes: 20  # Número de episodios para evaluar el modelo entrenado.
+  max_steps_per_episode: 100000  # Máximo de pasos por episodio durante la evaluación.
+  seed: 42  # Semilla para reproducibilidad en la evaluación.

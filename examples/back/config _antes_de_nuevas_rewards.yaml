@@ -1,0 +1,84 @@
+# Configuración para el simulador F1TENTH multiagente y entrenamiento/evaluación de RL
+# Este archivo permite personalizar el entorno, las recompensas, el algoritmo y el modo de ejecución sin modificar el código.
+# Los comentarios explican cada parámetro y sus valores posibles.
+
+# Modo de ejecución
+mode: "eval"  # Modo de ejecución. Opciones: "train" (entrenamiento), "eval" (evaluación).
+
+# Configuración del entorno F1TENTH
+environment:
+  map: "Monza"  # Mapa de la pista. Opciones: "Spielberg", "Monaco", "Silverstone", o cualquier mapa compatible con F1TENTH.
+  num_agents: 2     # Número de coches (agentes) en la simulación. Valor mínimo: 1.
+  timestep: 0.01    # Intervalo de tiempo entre pasos de simulación (en segundos). Valor típico: 0.01.
+  num_beams: 36     # Número de rayos en el LIDAR para escaneos. Valores típicos: 36, 1080 (más rayos = más detalle, más lento).
+  integrator: "rk4" # Método de integración física. Opciones: "euler", "rk4" (Runge-Kutta, más preciso).
+  control_input:    # Entradas de control para los agentes.
+    - "speed"       # Velocidad lineal.
+    - "steering_angle"  # Ángulo de dirección.
+  observation_config:  # Configuración de las observaciones que reciben los agentes.
+    type: "original"  # Tipo de observación. Opciones: "original" (escaneos LIDAR, posición, etc.).
+  reset_config:     # Configuración para reiniciar el entorno.
+    type: "rl_random_static"  # Tipo de reinicio. Opciones: "rl_random_static" (posiciones iniciales aleatorias).
+  render_mode: null  # Modo de renderizado. Opciones: null (sin renderizado), "human" (visualización gráfica).
+
+# Configuración de la estrategia de recompensa
+reward:
+  strategy: "progress"  # Estrategia de recompensa. Opciones: "progress" (basada en progreso), "speed_track" (basada en velocidad y pista).
+  progress:            # Parámetros para la estrategia "progress".
+    progress_scale: 10.0  # Factor de escalado para el progreso (distancia recorrida). Mayor valor = mayor incentivo.
+    base_reward: 0.1      # Recompensa base por paso. Valor pequeño para mantener el agente activo.
+    collision_penalty: 100.0  # Penalización por colisión. Valor alto para desincentivar choques.
+  speed_track:         # Parámetros para la estrategia "speed_track".
+    speed_scale: 5.0    # Factor de escalado para la velocidad. Mayor valor = mayor incentivo a ir rápido.
+    track_deviation_penalty: 2.0  # Penalización por desviarse de la pista. Mayor valor = mayor incentivo a quedarse en la pista.
+    collision_penalty: 100.0  # Penalización por colisión.
+
+
+# Configuración del algoritmo de RL
+algorithm:
+  type: "ppo"  # Tipo de algoritmo. Opciones: "ppo", "sac", "ddpg", "td3".
+  ppo:         # Parámetros para PPO.
+    learning_rate: 0.0003  # Tasa de aprendizaje. Valores típicos: 0.0001 a 0.001.
+    gamma: 0.99           # Factor de descuento para recompensas futuras. Valores: 0.0 a 1.0.
+    train_batch_size: 4000  # Tamaño del lote de entrenamiento. Mayor valor = más estabilidad, más memoria.
+  sac:         # Parámetros para SAC.
+    learning_rate: 0.0003  # Tasa de aprendizaje. Valores típicos: 0.0001 a 0.001.
+    gamma: 0.99           # Factor de descuento para recompensas futuras. Valores: 0.0 a 1.0.
+    train_batch_size: 256  # Tamaño del lote de entrenamiento. Valor típico: 256.
+    tau: 0.005            # Tasa de actualización suave para redes objetivo. Valores típicos: 0.001 a 0.01.
+  ddpg:        # Parámetros para DDPG.
+    learning_rate: 0.0001  # Tasa de aprendizaje. Valores típicos: 0.00001 a 0.001.
+    gamma: 0.99           # Factor de descuento para recompensas futuras. Valores: 0.0 a 1.0.
+    train_batch_size: 128  # Tamaño del lote de entrenamiento. Valor típico: 128.
+    tau: 0.002            # Tasa de actualización suave para redes objetivo. Valores típicos: 0.001 a 0.01.
+  td3:         # Parámetros para TD3.
+    learning_rate: 0.0001  # Tasa de aprendizaje. Valores típicos: 0.00001 a 0.001.
+    gamma: 0.99           # Factor de descuento para recompensas futuras. Valores: 0.0 a 1.0.
+    train_batch_size: 128  # Tamaño del lote de entrenamiento. Valor típico: 128.
+    tau: 0.002            # Tasa de actualización suave para redes objetivo. Valores típicos: 0.001 a 0.01.
+    target_noise: 0.2     # Ruido añadido a las acciones objetivo. Valores típicos: 0.1 a 0.5.
+    noise_clip: 0.5       # Límite para el ruido de las acciones objetivo. Valores típicos: 0.5 a 1.0.
+
+# Configuración del entrenamiento
+#training:
+#  total_timesteps: 100000  # Número total de pasos de tiempo para entrenar. Mayor valor = entrenamiento más largo.
+#  save_every: 200        # Frecuencia (en pasos) para guardar el modelo durante el entrenamiento.
+
+training:
+  total_timesteps: 8000
+  save_every: 200
+  replay_buffer_config:
+    type: "MultiAgentPrioritizedReplayBuffer"
+    prioritized_replay_alpha: 0.6
+    prioritized_replay_beta: 0.4
+    prioritized_replay_eps: 1e-6
+    capacity: 100000
+    # Añade esta línea crítica
+    _enable_replay_buffer_api: True
+
+
+# Configuración de la evaluación
+evaluation:
+  num_episodes: 20       # Número de episodios para evaluar el modelo.
+  max_steps_per_episode: 100000  # Máximo número de pasos por episodio en evaluación.
+  seed: 42              # Semilla para reproducibilidad en la evaluación.

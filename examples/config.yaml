@@ -1,0 +1,79 @@
+
+# Configuración para el simulador F1TENTH multiagente y entrenamiento/evaluación de RL
+# Este archivo define el entorno, las recompensas, los algoritmos de aprendizaje por refuerzo,
+# y los parámetros de entrenamiento/evaluación. Los comentarios explican cada sección y parámetro.
+
+# Modo de ejecución
+mode: "train"
+
+# Configuración del entorno F1TENTH
+environment:
+  map: "Spielberg"  # Nombre del mapa de la pista. Carga "../maps/Spielberg/Spielberg_raceline.csv" para definir la línea de carrera.
+  num_agents: 2  # Número de agentes (coches) en la simulación. 2 agentes para pruebas competitivas.
+  timestep: 0.01  # Intervalo de tiempo entre pasos de simulación (en segundos). Afecta la dinámica física.
+  num_beams: 36  # Número de rayos en el escaneo LIDAR. 36 proporciona suficiente resolución con bajo costo computacional.
+  integrator: "rk4"  # Método de integración para la simulación física. "rk4" (Runge-Kutta 4) es más preciso que "euler".
+  control_input:  # Entradas de control que los agentes pueden ajustar.
+    - "speed"  # Velocidad lineal del coche (en m/s).
+    - "steering_angle"  # Ángulo de dirección (en radianes).
+  observation_config:  # Configuración de las observaciones que reciben los agentes.
+    type: "original"  # Tipo de observación. "original" incluye escaneos LIDAR, posición, orientación, y velocidad.
+  reset_config:  # Configuración para reiniciar el entorno al comienzo de cada episodio.
+    type: "rl_random_static"  # Reinicio aleatorio pero estático para RL, coloca el coche en posiciones iniciales variadas.
+  render_mode: "train"
+
+# Configuración de la estrategia de recompensa por agente
+reward:
+  agents:
+    agent_0:
+      strategy: "raceperformance"  # Estrategia para el agente 0
+      raceperformance:
+        progress_scale: 15.0
+        speed_scale: 5.0
+        collision_penalty: 350.0
+        overtake_bonus: 50.0
+        stall_penalty: 10.0
+        jerk_penalty: 4.0
+        min_speed_threshold: 1.0
+    agent_1:
+      strategy: "crosstrack"  # Estrategia diferente para el agente 1
+      crosstrack:
+        map_path: "../maps/Spielberg/Spielberg_raceline.csv"
+        lookahead_distance: 1.5
+        wheelbase: 0.33
+        max_steer: 0.5
+        cte_scale: 3.0
+        he_scale: 2.0
+        max_cte: 2.0
+        max_he: 0.7854
+        collision_penalty: 100.0
+
+# Configuración del algoritmo de RL por agente
+algorithm:
+  agents:
+    agent_0:
+      type: "ppo"  # Algoritmo PPO para el agente 0
+      ppo:
+        learning_rate: 0.001
+        gamma: 0.98
+        train_batch_size: 4000
+    agent_1:
+      type: "sac"  # Algoritmo SAC para el agente 1
+      sac:
+        learning_rate: 0.0003
+        gamma: 0.99
+        train_batch_size: 256
+        tau: 0.005
+
+# Configuración del entrenamiento
+training:
+  total_timesteps: 100 # Total de pasos de entrenamiento (timesteps) para cada agente.
+  save_every: 200  # Frecuencia (en pasos) para guardar puntos de control del modelo.
+  save_best_metric: "episode_reward_mean"  # Métrica para determinar el mejor modelo
+  save_best_threshold: 0.0  # Umbral inicial para el mejor modelo (se actualiza dinámicamente)
+
+# Configuración de la evaluación
+evaluation:
+  num_episodes: 20  # Número de episodios para evaluar el modelo entrenado.
+  max_steps_per_episode: 100000  # Máximo de pasos por episodio durante la evaluación.
+  seed: 42  # Semilla para reproducibilidad en la evaluación.

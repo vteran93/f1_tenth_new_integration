@@ -1,0 +1,68 @@
+
+
+mode: eval
+environment:
+  num_agents: 2
+  num_beams: 36
+  map_path: ../maps/Spielberg/Spielberg_raceline.csv
+  map: Spielberg
+  timestep: 0.002
+  integrator: rk4
+  control_input: ["speed", "steering_angle"]
+  observation_config:
+    type: original
+  reset_config:
+    type: rl_random_random
+  max_steps: 2000
+  render_mode: human  # Cambiado de null a human para visualización
+algorithm:
+  agents:
+    agent_0:
+      type: ppo
+      train_batch_size: 4000
+      lambda_: 0.95
+      lr: 0.0003
+      clip_param: 0.2
+    agent_1:
+      type: sac
+      train_batch_size: 256
+      tau: 0.02
+      target_entropy: auto
+      lr: 0.0002
+      replay_buffer_config:
+        type: MultiAgentPrioritizedReplayBuffer
+        capacity: 100000
+        prioritized_replay_alpha: 0.6
+        prioritized_replay_beta: 0.4
+        prioritized_replay_eps: 1e-06
+reward:
+  agents:
+    agent_0:
+      strategy: raceperformance
+      raceperformance:
+        progress_scale: 50.0
+        speed_scale: 10.0
+        collision_penalty: 50.0
+        overtake_bonus: 100.0
+        stall_penalty: 0.3
+        jerk_penalty: 0.2
+        min_speed_threshold: 1.0
+    agent_1:
+      strategy: crosstrack
+      crosstrack:
+        map_path: ../maps/Spielberg/Spielberg_raceline.csv
+        lookahead_distance: 0.8
+        wheelbase: 0.33
+        max_steer: 0.10
+        cte_scale: 1.5
+        he_scale: 0.5
+        max_cte: 2.0
+        max_he: 0.7854
+        collision_penalty: 20.0
+training:
+  total_timesteps: 100000
+  save_every: 1000
+  save_best_metric: episode_reward_mean
+  save_best_threshold: -1000.0
+  render_training: false  # Desactivado en eval
+  render_interval: 200

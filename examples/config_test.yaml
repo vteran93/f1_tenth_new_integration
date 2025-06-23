@@ -1,0 +1,85 @@
+# Configuración general del modo de ejecución
+mode: eval  # Cambiar a 'eval' para evaluar un modelo entrenado; 'train' para reentrenar desde cero
+#checkpoint_path: /home/pepe/Desarrollo/f1_tenth_new_integration-ray-sergio/f1_tenth_new_integration-ray-sergio/examples/models/multiagent_run_1750609088/final/checkpoint-200
+checkpoint_path: /home/pepe/Desarrollo/f1_tenth_new_integration-ray-sergio/f1_tenth_new_integration-ray-sergio/examples/models/multiagent_run_1750671239/final
+
+# Configuración del entorno de simulación
+environment:
+  num_agents: 2  # Número de agentes (mantener en 2 para agent_0 y agent_1)
+  num_beams: 36  # Número de haces del LIDAR (ajustar solo si cambias la observación; 36 es estándar)
+  map_path: ../maps/Spielberg/Spielberg_raceline.csv  # Ruta al archivo de la pista (verificar que exista)
+  map: Spielberg  # Nombre de la pista (mantener coherente con map_path)
+  timestep: 0.01  # [AJUSTAR PARA ENTRENAMIENTO/EVALUACIÓN] Paso de tiempo de simulación (aumentar a 0.01 para acelerar, reducir a 0.002 si necesitas precisión)
+  integrator: rk4  # Método de integración (mantener rk4 para precisión)
+  control_input: ["speed", "steering_angle"]  # Tipos de control (no cambiar a menos que modifiques las acciones)
+  observation_config:
+    type: original  # Tipo de observación (mantener original a menos que uses una configuración personalizada)
+  reset_config:
+    type: rl_random_random  # Método de reinicio (mantener rl_random_random para posiciones aleatorias iniciales)
+  max_steps: 5000  # [AJUSTAR PARA ENTRENAMIENTO/EVALUACIÓN] Máximo de pasos por episodio (aumentar a 5000 para entrenamiento largo, mantener 2000 para evaluación rápida)
+  render_mode: human  # [AJUSTAR PARA EVALUACIÓN] 'human' para ver la simulación, 'None' para entrenamiento sin renderizado (ahorra recursos)
+
+# Configuración del algoritmo de aprendizaje
+algorithm:
+  agents:
+    agent_0:  # Agente con PPO
+      type: ppo  # Algoritmo (mantener ppo a menos que pruebes otro)
+      train_batch_size: 4000  # [AJUSTAR PARA ENTRENAMIENTO] Tamaño del lote de entrenamiento (aumentar a 8000 para más datos, reducir a 2000 si es lento)
+      lambda_: 0.95  # Factor de descuento GAE (ajustar entre 0.9-0.99 si la política es inestable)
+      lr: 0.0003  # [AJUSTAR PARA ENTRENAMIENTO] Tasa de aprendizaje (reducir a 0.0001 si diverge, aumentar a 0.0005 si converge lento)
+      clip_param: 0.2  # Parámetro de clipping (ajustar entre 0.1-0.3 si las recompensas varían mucho)
+    agent_1:  # Agente con SAC
+      type: sac  # Algoritmo (mantener sac a menos que pruebes otro)
+      train_batch_size: 256  # [AJUSTAR PARA ENTRENAMIENTO] Tamaño del lote (aumentar a 512 si hay recursos, reducir a 128 si es lento)
+      tau: 0.02  # Tasa de actualización de la red objetivo (ajustar entre 0.01-0.05 si la convergencia es lenta)
+      target_entropy: auto  # Entropía objetivo (mantener auto a menos que desees fijarla manualmente)
+      lr: 0.0002  # [AJUSTAR PARA ENTRENAMIENTO] Tasa de aprendizaje (reducir a 0.0001 si oscila, aumentar a 0.0003 si es lento)
+      replay_buffer_config:
+        type: MultiAgentPrioritizedReplayBuffer  # Tipo de buffer (mantener a menos que uses otro)
+        capacity: 100000  # [AJUSTAR PARA ENTRENAMIENTO] Capacidad del buffer (aumentar a 200000 si hay memoria, reducir a 50000 si es limitado)
+        prioritized_replay_alpha: 0.6  # Parámetro de priorización (ajustar entre 0.4-0.8 según estabilidad)
+        prioritized_replay_beta: 0.4  # Parámetro de corrección de sesgo (ajustar entre 0.2-0.6)
+        prioritized_replay_eps: 1e-06  # Ruido mínimo (mantener salvo inestabilidad)
+
+# Configuración de las recompensas
+reward:
+  agents:
+    agent_0:  # Recompensa basada en rendimiento de carrera
+      strategy: raceperformance
+      raceperformance:
+        progress_scale: 100.0  # [AJUSTAR PARA ENTRENAMIENTO] Escala del progreso (aumentar a 150.0 para incentivar más el avance, reducir a 50.0 si sobrecompensa)
+        speed_scale: 5.0  # [AJUSTAR PARA ENTRENAMIENTO] Escala de velocidad (reducir a 2.0 si la velocidad es excesiva, aumentar a 10.0 si es lenta)
+        collision_penalty: 50.0  # Penalización por colisión (aumentar a 100.0 si colisiona mucho, reducir a 25.0 si es raro)
+        overtake_bonus: 100.0  # Bonificación por adelantamiento (mantener o aumentar a 150.0 si hay interacción)
+        stall_penalty: 0.3  # Penalización por estancamiento (aumentar a 1.0 si no avanza)
+        jerk_penalty: 0.2  # Penalización por sacudidas (aumentar a 0.5 si gira mucho, reducir a 0.1 si es estable)
+        min_speed_threshold: 1.0  # Umbral de velocidad mínima (ajustar a 0.5 si se estanca)
+    agent_1:  # Recompensa basada en error de trayectoria
+      strategy: crosstrack
+      crosstrack:
+        map_path: ../maps/Spielberg/Spielberg_raceline.csv  # Ruta al archivo de la pista (verificar coherencia)
+        lookahead_distance: 0.8  # Distancia de anticipación (ajustar a 1.0 si se desvía mucho)
+        wheelbase: 0.33  # Distancia entre ejes (mantener salvo cambio de vehículo)
+        max_steer: 0.5  # Máximo ángulo de dirección (reducir a 0.05 si gira excesivamente)
+        cte_scale: 1.0  # [AJUSTAR PARA ENTRENAMIENTO] Escala del error de trayectoria (aumentar a 3.0 si se sale, reducir a 1.0 si corrige bien)
+        he_scale: 0.5  # [AJUSTAR PARA ENTRENAMIENTO] Escala del error de orientación (aumentar a 1.0 si la orientación es mala)
+        max_cte: 2.0  # Máximo error de trayectoria permitido (aumentar a 3.0 si se trunca)
+        max_he: 0.7854  # Máximo error de orientación (mantener salvo problemas graves)
+        collision_penalty: 20.0  # Penalización por colisión (aumentar a 40.0 si colisiona)
+
+# Configuración del entrenamiento
+training:
+  total_timesteps: 200000  # [AJUSTAR PARA ENTRENAMIENTO] Total de pasos de entrenamiento (aumentar a 200000 para mejor convergencia)
+  save_every: 1000  # Frecuencia de guardado de checkpoints (reducir a 500 si necesitas más puntos)
+  save_best_metric: episode_reward_mean  # Métrica para guardar el mejor modelo (mantener a menos que cambies criterio)
+  save_best_threshold: -1000.0  # Umbral para guardar el mejor modelo (ajustar a 0.0 si las recompensas son positivas)
+  render_training: false  # [AJUSTAR PARA ENTRENAMIENTO] True para ver el entrenamiento, False para acelerar
+  render_interval: 200  # Intervalo de renderizado (aumentar a 500 si el renderizado es lento)
+
+# Configuración de la evaluación
+evaluation:
+  num_episodes: 5  # Número de episodios a evaluar (aumentar para más estadísticas)
+  max_steps_per_episode: 5000  # Máximo de pasos por episodio durante evaluación
+  seed: 42  # Semilla para reproducibilidad (cambiar para diferentes inicializaciones)
+  render: true  # Activar renderizado durante evaluación
+  save_video: false  # Guardar video de la evaluación (activar si necesitas grabaciones)
