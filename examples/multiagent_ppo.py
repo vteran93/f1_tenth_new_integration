@@ -95,11 +95,26 @@ class MultiAgentF110(MultiAgentEnv):
             obs_dict[agent] = agent_obs
         return obs_dict
 
+    def _convert_info(self, info, agent_keys):
+        """Convert multi-agent info dict to per-agent info dicts."""
+        info_dict = {}
+        for i, agent in enumerate(agent_keys):
+            agent_info = {}
+            for k, v in info.items():
+                if isinstance(v, np.ndarray) and v.shape and v.shape[0] == self.env.num_agents:
+                    agent_info[k] = v[i]
+                else:
+                    agent_info[k] = v
+            info_dict[agent] = agent_info
+        return info_dict
+
     def reset(self, *, seed=None, options=None):
         obs, info = self.env.reset(seed=seed, options=options)
         self._last_positions = [(self.env.poses_x[i], self.env.poses_y[i]) for i in range(self.env.num_agents)]
         self._crashed_agents = set()  # Reset crashed agents
-        return self._convert_obs(obs), {agent: info for agent in self.agents}
+        self._last_s = [0.0] * self.env.num_agents  # <-- Reset progress tracker
+
+        return self._convert_obs(obs), self._convert_info(info, self.agents)
 
     def step(self, action_dict):
         # Filter actions: crashed agents get zero action
@@ -155,7 +170,7 @@ class MultiAgentF110(MultiAgentEnv):
         truncated_dict["__all__"] = truncated
         
         # Info dict only for active/newly crashed agents
-        info_dict = {agent: info for agent in obs_dict.keys()}
+        info_dict = self._convert_info(info, obs_dict.keys())
         
         return obs_dict, rew_dict, terminated_dict, truncated_dict, info_dict
 
@@ -227,70 +242,6 @@ class MultiAgentF110(MultiAgentEnv):
             dtype=np.float32
         )
     
-class geminiReward(MultiAgentF110):
-    """Custom reward function for Gemini."""
-
-    def _get_rewards(self, newly_crashed):
-        """
-        Calculate individual rewards for each agent, combining track progress
-        with incentives for survival and penalties for collisions.
-        This version is improved by:
-        - Using track progress as the primary reward (from Function 1).
-        - Adding a survival reward for each step without a crash (inspired by Function 2).
-        - Applying a more significant collision penalty (inspired by Function 2).
-        - Scaling the progress reward to provide a stronger learning signal.
-        - Correcting the lap completion logic.
-        """
-        
-        # Initialize last_s tracking if not exists
-        if not hasattr(self, '_last_s'):
-            self._last_s = [0.0] * self.env.num_agents
-
-        rewards = []
-        track_length = self.env.track.centerline.spline.s[-1]
-
-        for i in range(self.env.num_agents):
-            agent = self.agents[i]
-            
-            if agent in self._crashed_agents and agent not in newly_crashed:
-                # Agent was already crashed - no reward
-                reward = 0.0
-            else:
-                # Calculate track progress using centerline spline
-                current_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
-                    self.env.poses_x[i], self.env.poses_y[i]
-                )
-
-                # Calculate progress since last step
-                prog = current_s - self._last_s[i]
-                
-                # Correctly handle lap completion (wrap-around)
-                if prog < -0.5 * track_length:
-                    # Crossed finish line going forward
-                    prog += track_length
-                elif prog > 0.5 * track_length:
-                    # Crossed finish line going backward (unlikely but possible)
-                    prog -= track_length
-                
-                # Apply rewards based on state
-                if agent in newly_crashed:
-                    # Strong penalty for collision, inspired by Function 2
-                    reward = -5.0
-                else:
-                    # 1. Scaled progress reward (main incentive)
-                    progress_reward = prog * 10.0
-                    
-                    # 2. Small survival reward for each step not crashed (from Function 2)
-                    survival_reward = 0.01
-                    
-                    reward = progress_reward + survival_reward
-                
-                # Update last track position for this agent
-                self._last_s[i] = current_s
-            
-            rewards.append(reward)
-        
-        return rewards
 
 def get_env_config(render_mode=None):
     """Get environment configuration."""
@@ -309,10 +260,10 @@ def get_env_config(render_mode=None):
 
 def setup_policies_and_config():
     """Setup policies and PPO configuration. Returns (policies, config)."""
-    register_env("f1tenth_multi", lambda config: geminiReward(config))
+    register_env("f1tenth_multi", lambda config: MultiAgentF110(config))
     
     # Create temporary environment for policy setup
-    temp_env = geminiReward(get_env_config())
+    temp_env = MultiAgentF110(get_env_config())
     policies = {agent: PolicySpec(None, temp_env.observation_space, temp_env.action_space, {}) 
                 for agent in temp_env.agents}
     temp_env.close()
@@ -416,7 +367,7 @@ def setup_evaluation():
     algo.restore(model_path)
     
     # Run evaluation
-    eval_env = geminiReward(get_env_config(render_mode="human"))
+    eval_env = MultiAgentF110(get_env_config(render_mode="human"))
     
     for episode in range(3):
         obs_dict, _ = eval_env.reset(seed=episode)
