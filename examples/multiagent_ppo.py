@@ -40,58 +40,60 @@ class MultiAgentF110(MultiAgentEnv):
         self.env = F110Env(config=env_config or {}, render_mode=env_config.get("render_mode"))
         self.agents = [f"agent_{i}" for i in range(self.env.num_agents)]
         self._last_positions = [(0.0, 0.0)] * self.env.num_agents
-        self._crashed_agents = set()  # Track which agents have crashed
+        self._crashed_agents = set()
+
+        # --- Dynamic Normalization Setup ---
+        self.vehicle_params = self.env.params
+        self.max_scan_range = np.max(self.env.observation_space.spaces['scans'].high)
+        self.map_x_min = np.min(self.env.track.centerline.xs)
+        self.map_x_max = np.max(self.env.track.centerline.xs)
+        self.map_y_min = np.min(self.env.track.centerline.ys)
+        self.map_y_max = np.max(self.env.track.centerline.ys)
         
         # Extract single agent spaces from multi-agent F110Env
         self.action_space = self._make_single_agent_action_space()
         self.observation_space = self._make_single_agent_obs_space()
 
     def _make_single_agent_obs_space(self):
-        """Create single agent observation space from F110Env's multi-agent space."""
-        orig_spaces = self.env.observation_space.spaces
-        single_spaces = {}
-        
-        for key, space in orig_spaces.items():
-            if key == 'ego_idx':
-                # ego_idx is Discrete, convert to Box for single agent
-                single_spaces[key] = gym.spaces.Box(low=0, high=space.n-1, shape=(), dtype=np.int32)
-            elif hasattr(space, 'shape') and len(space.shape) > 0 and space.shape[0] == self.env.num_agents:
-                # Multi-agent dimension - extract single agent space
-                if key == 'scans':
-                    # scans: (num_agents, num_beams) -> (num_beams,)
-                    single_spaces[key] = gym.spaces.Box(low=space.low.min(), high=space.high.max(), 
-                                                      shape=(space.shape[1],), dtype=space.dtype)
-                else:
-                    # Other multi-agent arrays: (num_agents,) -> ()
-                    single_spaces[key] = gym.spaces.Box(low=space.low.min(), high=space.high.max(), 
-                                                      shape=(), dtype=space.dtype)
-            else:
-                # Keep space as-is (shouldn't happen in current F110Env)
-                single_spaces[key] = space
-                
-        return gym.spaces.Dict(single_spaces)
+        """Create a single agent's observation space with normalized bounds."""
+        return gym.spaces.Dict({
+            "ego_idx": gym.spaces.Box(low=0.0, high=1.0, shape=(), dtype=np.float32),
+            "scans": gym.spaces.Box(low=0.0, high=1.0, shape=(self.env.num_beams,), dtype=np.float32),
+            "poses_x": gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=np.float32),
+            "poses_y": gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=np.float32),
+            "poses_theta": gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=np.float32),
+            "linear_vels_x": gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=np.float32),
+            "linear_vels_y": gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=np.float32),
+            "ang_vels_z": gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=np.float32),
+            "collisions": gym.spaces.Box(low=0.0, high=1.0, shape=(), dtype=np.float32),
+        })
 
     def _convert_obs(self, obs):
-        """Convert multi-agent observation to per-agent format."""
+        """Convert multi-agent observation to per-agent format and apply normalization."""
         obs_dict = {}
+        v_min, v_max = self.vehicle_params['v_min'], self.vehicle_params['v_max']
+        sv_max = self.vehicle_params['sv_max']
+
         for i, agent in enumerate(self.agents):
             agent_obs = {}
-            for key, value in obs.items():
-                if key == 'ego_idx':
-                    # ego_idx is the same for all agents
-                    agent_obs[key] = np.array(value, dtype=np.int32)
-                elif hasattr(value, 'shape') and len(value.shape) > 0 and value.shape[0] == self.env.num_agents:
-                    # Multi-agent observation - extract for this agent
-                    original_space = self.env.observation_space.spaces[key]
-                    agent_obs[key] = np.clip(
-                        value[i].astype(original_space.dtype),
-                        original_space.low.min(),
-                        original_space.high.max()
-                    )
-                else:
-                    # Single value for all agents
-                    agent_obs[key] = np.array(value, dtype=value.dtype if hasattr(value, 'dtype') else np.float32)
             
+            agent_obs["ego_idx"] = float(i) / (self.env.num_agents - 1) if self.env.num_agents > 1 else 0.0
+            agent_obs["scans"] = np.clip(obs["scans"][i] / self.max_scan_range, 0.0, 1.0)
+            agent_obs["poses_x"] = 2 * (obs["poses_x"][i] - self.map_x_min) / (self.map_x_max - self.map_x_min) - 1
+            agent_obs["poses_y"] = 2 * (obs["poses_y"][i] - self.map_y_min) / (self.map_y_max - self.map_y_min) - 1
+            agent_obs["poses_theta"] = obs["poses_theta"][i] / np.pi
+            agent_obs["linear_vels_x"] = 2 * (obs["linear_vels_x"][i] - v_min) / (v_max - v_min) - 1
+            agent_obs["linear_vels_y"] = 2 * (obs["linear_vels_y"][i] - v_min) / (v_max - v_min) - 1
+            agent_obs["ang_vels_z"] = np.clip(obs["ang_vels_z"][i] / sv_max, -1.0, 1.0)
+            agent_obs["collisions"] = obs["collisions"][i].astype(float)
+
+            for key, value in agent_obs.items():
+                agent_obs[key] = np.array(value, dtype=np.float32)
+                if key in ["scans", "ego_idx", "collisions"]:
+                    agent_obs[key] = np.clip(agent_obs[key], 0.0, 1.0)
+                else:
+                    agent_obs[key] = np.clip(agent_obs[key], -1.0, 1.0)
+
             obs_dict[agent] = agent_obs
         return obs_dict
 
@@ -253,7 +255,7 @@ def get_env_config(render_mode=None):
         "integrator": "rk4",
         "control_input": ["speed", "steering_angle"],
         "observation_config": {"type": "original"},
-        "reset_config": {"type": "rl_random_static"},
+        "reset_config": {"type": "cl_grid_static"},
         "render_mode": render_mode,
     }
 
