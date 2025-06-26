@@ -175,3 +175,10 @@ cython_debug/
 examples/wandb
 examples/models
 examples/runs
+venv/*
+checkpoints/
+videos/*
+wandb/*
+runs/*
+*/videos/*
+*/backups/*

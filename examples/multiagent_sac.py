@@ -3,7 +3,6 @@
 Simplified F1TENTH Multi-Agent SAC Training/Evaluation Script
 Supports both training and evaluation with minimal configuration using SAC algorithm.
 """
-
 import numpy as np
 import ray
 from ray.tune.logger import UnifiedLogger
@@ -96,6 +95,7 @@ class MultiAgentF110(MultiAgentEnv):
         return obs_dict
 
     def reset(self, *, seed=None, options=None):
+        self._step_counter = 0
         obs, info = self.env.reset(seed=seed, options=options)
         self._last_positions = [(self.env.poses_x[i], self.env.poses_y[i]) for i in range(self.env.num_agents)]
         return self._convert_obs(obs), {agent: info for agent in self.agents}
@@ -103,13 +103,11 @@ class MultiAgentF110(MultiAgentEnv):
     def step(self, action_dict):
         actions = np.array([action_dict[agent] for agent in self.agents])
         obs, _, terminated, truncated, info = self.env.step(actions)
-
+        self._step_counter = self._step_counter + 1 if hasattr(self, '_step_counter') else 1
         # Calculate rewards
         rewards = []
         for i in range(self.env.num_agents):
-            pos = (self.env.poses_x[i], self.env.poses_y[i])
-            progress = np.linalg.norm(np.array(pos) - np.array(self._last_positions[i]))
-            reward = progress * 10.0 + 0.1 - (100.0 if self.env.collisions[i] else 0.0)
+            reward, pos = self.calculate_progress_reward(self._step_counter, i)
             rewards.append(reward)
             self._last_positions[i] = pos
 
@@ -127,6 +125,48 @@ class MultiAgentF110(MultiAgentEnv):
 
     def close(self):
         self.env.close()
+
+    def calculate_progress_reward(self, step_count, i) -> list[float]:
+        """
+        Calcula la recompensa para cada agente basado en:
+        - Distancia proyectada hacia adelante (según orientación).
+        - Penalización por estar quieto.
+        - Penalización por colisión.
+        - Recompensa adicional cada 100 pasos sin colisión.
+
+        Args:
+            step_count (int): Número actual de steps en el episodio.
+
+        Returns:
+            list[float]: Lista de recompensas por agente.
+        """
+        # Posiciones y orientación actual
+        pos = np.array([self.env.poses_x[i], self.env.poses_y[i]])
+        last_pos = np.array(self._last_positions[i])
+        displacement = pos - last_pos
+
+        # Vector de orientación (hacia donde "mira" el carro)
+        heading = np.array([np.cos(self.env.poses_theta[i]), np.sin(self.env.poses_theta[i])])
+
+        # Componente del movimiento en dirección del heading
+        progress = np.dot(displacement, heading)
+
+        # Recompensa base proporcional al progreso hacia adelante
+        reward = progress * 10.0
+
+        # Penalización por estar prácticamente quieto (tolerancia de ruido)
+        if np.linalg.norm(displacement) < 0.01:
+            reward -= 0.1  # castigo por hacer el vegetal
+
+        # Penalización dura por colisión
+        if self.env.collisions[i]:
+            reward -= 100.0
+        else:
+            # Bonus cada 100 pasos sin chocarse
+            if step_count > 0 and step_count % 100 == 0:
+                reward += 20.0  # celebración estilo Fórmula 1
+
+        return reward, pos
 
 
 def get_env_config(render_mode=None):
@@ -157,7 +197,8 @@ def setup_policies_and_config():
     config = (SACConfig()
               .environment("f1tenth_multi", env_config=get_env_config())
               .framework("torch")
-              .api_stack(enable_rl_module_and_learner=False, enable_env_runner_and_connector_v2=False)
+              .resources(num_gpus=1)  # Use 1 GPU if available)
+              .api_stack(eable_rl_module_and_learner=False, enable_env_runner_and_connector_v2=False)
               .env_runners(num_env_runners=0)
               .multi_agent(policies=policies, policy_mapping_fn=lambda agent_id, *args, **kwargs: agent_id)
               .training(replay_buffer_config={'type': 'MultiAgentPrioritizedReplayBuffer',
@@ -227,7 +268,7 @@ def setup_ray_and_algo(config):
     ray.init(ignore_reinit_error=True)
     # Create a per-run log directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = os.path.abspath(f"runs/multiagent_sac_{timestamp}")
+    log_dir = os.path.abspath(f"runs/multiagent_sac_victor_{timestamp}")
     os.makedirs(log_dir, exist_ok=True)
 
     # Build with a custom logger_creator to dump TB event files there
@@ -242,7 +283,7 @@ def setup_training():
 
     # Setup
     timestamp = str(int(time.time()))
-    model_dir = f"models/multiagent_sac_run_{timestamp}"
+    model_dir = f"models/multiagent_sac_victor_run_{timestamp}"
     os.makedirs(model_dir, exist_ok=True)
 
     # Setup policies and config
@@ -250,8 +291,8 @@ def setup_training():
     algo = setup_ray_and_algo(config)
 
     # Training loop
-    TOTAL_TIMESTEPS = 20_000
-    SAVE_EVERY = 200
+    TOTAL_TIMESTEPS = 200_000
+    SAVE_EVERY = 10000
 
     while True:
         result = algo.train()
@@ -279,7 +320,7 @@ def setup_evaluation():
         print("No models directory found. Train a model first.")
         return
 
-    run_dirs = [d for d in os.listdir(models_dir) if d.startswith("multiagent_sac_run_")]
+    run_dirs = [d for d in os.listdir(models_dir) if d.startswith("multiagent_sac_victor_run_")]
     if not run_dirs:
         print("No trained models found. Train a model first.")
         return
@@ -317,6 +358,10 @@ def setup_evaluation():
 
 
 if __name__ == "__main__":
+    import torch
+    print("GPU disponible:", torch.cuda.is_available())
+    print("Nombre GPU:", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "No hay GPU")
+    print("Oro?")
     parser = argparse.ArgumentParser(description="F1TENTH Multi-Agent RL Training/Evaluation")
     parser.add_argument("--train", action="store_true", help="Run training mode instead of evaluation")
     args = parser.parse_args()
