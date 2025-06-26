@@ -1,3 +1,4 @@
+examples/ray_results
 build/
 gym/f110_gym.egg-info
 __pycache__
