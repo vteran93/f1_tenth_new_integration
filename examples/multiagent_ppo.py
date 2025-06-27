@@ -326,7 +326,7 @@ def setup_training():
     algo = setup_ray_and_algo(config)
     
     # Training loop
-    TOTAL_TIMESTEPS = 500_000
+    TOTAL_TIMESTEPS = 200_000
     
     while True:
         result = algo.train()
