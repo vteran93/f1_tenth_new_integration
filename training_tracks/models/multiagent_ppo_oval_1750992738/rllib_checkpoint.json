@@ -1,0 +1,1 @@
+{"type": "Algorithm", "checkpoint_version": "1.1", "format": "cloudpickle", "state_file": "models/multiagent_ppo_oval_1750992738/algorithm_state.pkl", "policy_ids": ["agent_1", "agent_0"], "ray_version": "2.47.0", "ray_commit": "6f4c0c0b3e9ff4fc485111adbbc613ade819548b"}
