@@ -1,8 +1,10 @@
 tau: 0.005
-target_entropy: "auto"
+target_entropy: auto
 alpha_lr: 0.0003
+# environment:
+#   normalize_actions: False # This affects A LOT the performance of the agent
 replay_buffer_config:
   type: MultiAgentPrioritizedReplayBuffer
-  prioritized_replay_alpha: [alpha]
-  prioritized_replay_beta: [beta]
-  prioritized_replay_eps:  [eps]
+  # prioritized_replay_alpha: alpha
+  # prioritized_replay_beta: beta
+  # prioritized_replay_eps:  eps

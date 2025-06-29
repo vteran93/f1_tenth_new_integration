@@ -1,5 +1,5 @@
 # --- General experiment settings ---
-experiment_name: f1tenth_multiagent_ppo
+experiment_name: f1tenth_multiagent_SAC
 storage_path: ../models # Relative path to store experiment results
 env_config_path: env.yaml
 

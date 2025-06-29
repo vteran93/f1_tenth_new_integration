@@ -2,4 +2,4 @@ gamma: 0.99
 lr: 0.00005
 train_batch_size: 4000
 environment:
-  normalize_actions: False
+  normalize_actions: True # This affects A LOT the performance of the agent

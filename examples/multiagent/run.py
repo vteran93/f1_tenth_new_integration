@@ -35,12 +35,16 @@ def get_algorithm_config(config, env_config, policies):
 
     algo_config_file = load_config(config[config_key])
     env_kwargs = algo_config_file.get('environment', {}) 
-    if 'environment' in algo_config_file:
-        del algo_config_file['environment']['env_name']
     
+    if 'environment' in algo_config_file:
+        del algo_config_file['environment']
+    if 'env_name' in algo_config_file.get('environment',{}):
+        del algo_config_file['environment']['env_name']
+        
     algo_config = (
         AlgoConfigClass()
-        .environment(get_reward_class(config), env_config=env_config, **env_kwargs) 
+        .environment(get_reward_class(config), env_config=env_config,) 
+        #.environment(get_reward_class(config), env_config=env_config, **env_kwargs) 
         .framework("torch")
         .api_stack(
             enable_rl_module_and_learner=False,
