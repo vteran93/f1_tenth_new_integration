@@ -81,7 +81,13 @@ def run_training(config, resume):
         algorithm_name,
         config=config_algo.to_dict(),
         stop={"timesteps_total": config["training"]["timesteps_total"]},
-        checkpoint_config=tune.CheckpointConfig(checkpoint_at_end=True, checkpoint_frequency=10),
+        checkpoint_config=tune.CheckpointConfig(
+            checkpoint_score_attribute="episode_reward_mean",
+            checkpoint_score_order="max",
+            num_to_keep=3,
+            checkpoint_at_end=True,
+            checkpoint_frequency=10
+        ),
         storage_path=config["storage_path"],
         name=config["experiment_name"],
         resume=resume
