@@ -29,7 +29,7 @@ def get_algorithm_config(config, env_config, policies):
 
     AlgoConfigClass, config_key = ALGO_MAP[algorithm_name]
     
-    algo_config_file = load_config(f"examples/multiagent/configs/{config[config_key]}")
+    algo_config_file = load_config(f"configs/{config[config_key]}")
 
     algo_config = (
         AlgoConfigClass()
@@ -55,29 +55,13 @@ def get_algorithm_config(config, env_config, policies):
         .debugging(seed=42)
     )
 
-    # Separate training-specific parameters from others
-    training_params = {
-        k: v for k, v in algo_config_file.items() 
-        if k in ['lambda_', 'vf_loss_coeff', 'entropy_coeff', 'clip_param', 'vf_clip_param']
-    }
-    
-    # Set general parameters
-    for key, value in algo_config_file.items():
-        if key not in training_params:
-            if hasattr(algo_config, key):
-                setattr(algo_config, key, value)
-            else:
-                logger.warning(f"Unknown config key for {algorithm_name}: {key}")
-
-    # Set training-specific parameters
-    if training_params:
-        algo_config.training(**training_params)
+    algo_config.training(**algo_config_file)
 
     return algo_config
 
 def create_env(config, render_mode=None):
     """Loads environment config and creates an environment instance."""
-    env_config = load_config(f"examples/multiagent/configs/{config['env_config']}")
+    env_config = load_config(f"configs/{config['env_config']}")
     if render_mode:
         env_config["render_mode"] = render_mode
     
@@ -148,7 +132,7 @@ if __name__ == "__main__":
     parser.add_argument("--train", action="store_true", help="Train the model")
     parser.add_argument("--resume", action="store_true", help="Resume training from a checkpoint")
     parser.add_argument("--eval", action="store_true", help="Evaluate the model")
-    parser.add_argument("--config_path", default="examples/multiagent/configs/run.yaml", help="Path to the run config file")
+    parser.add_argument("--config_path", default="configs/run.yaml", help="Path to the run config file")
     
     args = parser.parse_args()
 

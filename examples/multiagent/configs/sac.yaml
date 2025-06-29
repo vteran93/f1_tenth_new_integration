@@ -1,16 +1,7 @@
-gamma: 0.99
-lr: 0.0003
-train_batch_size: 256
 buffer_size: 1000000
 learning_starts: 1000
 tau: 0.005
 target_entropy: "auto"
-q_model_config:
-  fcnet_hiddens: [256, 256]
-policy_model_config:
-  fcnet_hiddens: [256, 256]
-replay_buffer_config:
-  type: MultiAgentPrioritizedReplayBuffer
-  prioritized_replay_alpha: 0.6
-  prioritized_replay_beta: 0.4
-  prioritized_replay_eps: 0.000001
+q_lr: 0.0003
+policy_lr: 0.0003
+alpha_lr: 0.0003

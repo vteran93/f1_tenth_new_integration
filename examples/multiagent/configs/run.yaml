@@ -1,15 +1,20 @@
 # --- General experiment settings ---
 experiment_name: f1tenth_multiagent_ppo
-storage_path: /home/sergio/repos/f1_tenth_new_integration/models # Relative path to store experiment results
+storage_path: ../models # Relative path to store experiment results
 env_config: env.yaml
 ppo_config: ppo.yaml
 sac_config: sac.yaml
 
+# --- Training settings ---
 training:
+  algorithm: PPO
+  reward_function: ProgressRewardEnv
   timesteps_total: 20_000
   eval_interval: 2000
-  reward_function: ProgressRewardEnv
-  algorithm: PPO
+  gamma: 0.99
+  lr: 0.00005
+  train_batch_size: 4000
 
+# --- Evaluation settings ---
 evaluation:
-  episodes: 20
+  episodes: 5
