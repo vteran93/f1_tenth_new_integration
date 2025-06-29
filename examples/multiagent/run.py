@@ -43,8 +43,7 @@ def get_algorithm_config(config, env_config, policies):
         
     algo_config = (
         AlgoConfigClass()
-        .environment(get_reward_class(config), env_config=env_config,) 
-        #.environment(get_reward_class(config), env_config=env_config, **env_kwargs) 
+        .environment(get_reward_class(config), env_config=env_config, **env_kwargs)
         .framework("torch")
         .api_stack(
             enable_rl_module_and_learner=False,
@@ -111,12 +110,35 @@ def run_training(config, resume):
     )
 
 
-def run_evaluation(config):
+def run_evaluation(config, run_name=None):
     logger.info("Starting evaluation...")
     experiment_path = get_experiment_path(config["experiment_name"], config["storage_path"])
 
     logger.info(f"Loading results from: {experiment_path}")
     analysis = ExperimentAnalysis(experiment_path)
+    
+    if run_name:
+        # Filter trials by run_name pattern - check both trial_id and the full directory path
+        filtered_trials = []
+        for trial in analysis.trials:
+            # Check if run_name matches either the trial_id or any part of the full path
+            trial_path = trial.local_dir if hasattr(trial, 'local_dir') else ''
+            if (run_name in trial.trial_id or 
+                run_name in trial_path):
+                filtered_trials.append(trial)
+        
+        if not filtered_trials:
+            logger.error(f"No trials found matching run name: {run_name}")
+            available_names = []
+            for trial in analysis.trials:
+                trial_path = trial.local_dir if hasattr(trial, 'local_dir') else 'N/A'
+                available_names.append(f"ID: {trial.trial_id}, Path: {trial_path}")
+            logger.info(f"Available trials: {available_names}")
+            return
+        # Create a new analysis with filtered trials
+        analysis.trials = filtered_trials
+        logger.info(f"Found {len(filtered_trials)} trial(s) matching '{run_name}'")
+    
     best_checkpoint = get_best_checkpoint(analysis)
 
     if not best_checkpoint:
@@ -164,6 +186,8 @@ if __name__ == "__main__":
 
     # Create the parser for the "eval" command
     parser_eval = subparsers.add_parser("eval", help="Evaluate the model")
+    # Add an optional argument to specify the run to evaluate
+    parser_eval.add_argument("--run_name", type=str, help="Name of the run to evaluate")
 
     args = parser.parse_args()
 
@@ -183,4 +207,4 @@ if __name__ == "__main__":
     if args.command == "train":
         run_training(config, args.resume)
     elif args.command == "eval":
-        run_evaluation(config)
+        run_evaluation(config, args.run_name)
