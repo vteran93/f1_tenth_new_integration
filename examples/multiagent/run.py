@@ -16,19 +16,21 @@ ALGO_MAP = {
     "SAC": (SACConfig, "sac_config"),
 }
 
+
 def get_reward_class(config):
     reward_function_name = config['training']['reward_function']
     reward_module = importlib.import_module('lib.rewards')
     return getattr(reward_module, reward_function_name)
 
+
 def get_algorithm_config(config, env_config, policies):
     algorithm_name = config['training']['algorithm']
-    
+
     if algorithm_name not in ALGO_MAP:
         raise ValueError(f"Unknown algorithm: {algorithm_name}")
 
     AlgoConfigClass, config_key = ALGO_MAP[algorithm_name]
-    
+
     algo_config_file = load_config(f"configs/{config[config_key]}")
 
     algo_config = (
@@ -54,19 +56,22 @@ def get_algorithm_config(config, env_config, policies):
         )
         .debugging(seed=42)
     )
-
+    import pdb
+    pdb.set_trace()
     algo_config.training(**algo_config_file)
 
     return algo_config
+
 
 def create_env(config, render_mode=None):
     """Loads environment config and creates an environment instance."""
     env_config = load_config(f"configs/{config['env_config']}")
     if render_mode:
         env_config["render_mode"] = render_mode
-    
+
     reward_class = get_reward_class(config)
     return reward_class(env_config=env_config), env_config
+
 
 def run_training(config, resume):
     temp_env, env_config = create_env(config)
@@ -93,10 +98,11 @@ def run_training(config, resume):
         resume=resume
     )
 
+
 def run_evaluation(config):
     logger.info("Starting evaluation...")
     experiment_path = get_experiment_path(config["experiment_name"], config["storage_path"])
-    
+
     logger.info(f"Loading results from: {experiment_path}")
     analysis = ExperimentAnalysis(experiment_path)
     best_checkpoint = get_best_checkpoint(analysis)
@@ -136,7 +142,7 @@ def run_evaluation(config):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run F1TENTH multi-agent training or evaluation.")
     parser.add_argument("--config_path", default="configs/run.yaml", help="Path to the run config file")
-    
+
     # Create subparsers for train and eval commands
     subparsers = parser.add_subparsers(dest="command", help="Available commands", required=True)
 
