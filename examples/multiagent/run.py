@@ -129,18 +129,24 @@ def run_evaluation(config):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run F1TENTH multi-agent training or evaluation.")
-    parser.add_argument("--train", action="store_true", help="Train the model")
-    parser.add_argument("--resume", action="store_true", help="Resume training from a checkpoint")
-    parser.add_argument("--eval", action="store_true", help="Evaluate the model")
     parser.add_argument("--config_path", default="configs/run.yaml", help="Path to the run config file")
     
+    # Create subparsers for train and eval commands
+    subparsers = parser.add_subparsers(dest="command", help="Available commands", required=True)
+
+    # Create the parser for the "train" command
+    parser_train = subparsers.add_parser("train", help="Train the model")
+    parser_train.add_argument("--resume", action="store_true", help="Resume training from a checkpoint")
+
+    # Create the parser for the "eval" command
+    parser_eval = subparsers.add_parser("eval", help="Evaluate the model")
+
     args = parser.parse_args()
 
     config = load_config(args.config_path)
     init_ray()
 
-    if args.train:
+    if args.command == "train":
         run_training(config, args.resume)
-
-    if args.eval:
+    elif args.command == "eval":
         run_evaluation(config)
