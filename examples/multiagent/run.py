@@ -1,5 +1,6 @@
 import argparse
 import importlib
+import os
 from lib.utils import load_config, init_ray, get_logger, suppress_warnings, get_experiment_path, get_best_checkpoint
 from ray import tune
 from ray.rllib.algorithms.ppo import PPOConfig
@@ -7,13 +8,14 @@ from ray.rllib.algorithms.sac import SACConfig
 from ray.rllib.policy.policy import PolicySpec
 from ray.rllib.algorithms.algorithm import Algorithm
 from ray.tune.analysis import ExperimentAnalysis
+import datetime
 
 suppress_warnings()
 logger = get_logger(__name__)
 
 ALGO_MAP = {
-    "PPO": (PPOConfig, "ppo_config"),
-    "SAC": (SACConfig, "sac_config"),
+    "PPO": (PPOConfig, "ppo_config_path"),
+    "SAC": (SACConfig, "sac_config_path"),
 }
 
 
@@ -31,11 +33,14 @@ def get_algorithm_config(config, env_config, policies):
 
     AlgoConfigClass, config_key = ALGO_MAP[algorithm_name]
 
-    algo_config_file = load_config(f"configs/{config[config_key]}")
-
+    algo_config_file = load_config(config[config_key])
+    env_kwargs = algo_config_file.get('environment', {}) 
+    if 'environment' in algo_config_file:
+        del algo_config_file['environment']['env_name']
+    
     algo_config = (
         AlgoConfigClass()
-        .environment(get_reward_class(config), env_config=env_config)
+        .environment(get_reward_class(config), env_config=env_config, **env_kwargs) 
         .framework("torch")
         .api_stack(
             enable_rl_module_and_learner=False,
@@ -56,8 +61,7 @@ def get_algorithm_config(config, env_config, policies):
         )
         .debugging(seed=42)
     )
-    import pdb
-    pdb.set_trace()
+
     algo_config.training(**algo_config_file)
 
     return algo_config
@@ -65,7 +69,7 @@ def get_algorithm_config(config, env_config, policies):
 
 def create_env(config, render_mode=None):
     """Loads environment config and creates an environment instance."""
-    env_config = load_config(f"configs/{config['env_config']}")
+    env_config = load_config(config['env_config_path'])
     if render_mode:
         env_config["render_mode"] = render_mode
 
@@ -81,6 +85,9 @@ def run_training(config, resume):
 
     algorithm_name = config['training']['algorithm']
     config_algo = get_algorithm_config(config, env_config, policies)
+ 
+    global reward_function 
+    reward_function = config['training']['reward_function']
 
     tune.run(
         algorithm_name,
@@ -95,7 +102,8 @@ def run_training(config, resume):
         ),
         storage_path=config["storage_path"],
         name=config["experiment_name"],
-        resume=resume
+        resume=resume,
+        trial_name_creator= lambda trial: f"{trial.trainable_name}_{reward_function}_{trial.trial_id}_{trial.restore_path}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}",
     )
 
 
@@ -155,8 +163,18 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    CONFIG_DIR = os.path.dirname(os.path.abspath(args.config_path))
     config = load_config(args.config_path)
     init_ray()
+
+    # Helper to resolve a path relative to CONFIG_DIR
+    def resolve_path(path):
+        return path if os.path.isabs(path) else os.path.abspath(os.path.join(CONFIG_DIR, path))
+
+    # Resolve all *_config and storage_path keys
+    for key in list(config.keys()):
+        if key.endswith("_path"):
+            config[key] = resolve_path(config[key])
 
     if args.command == "train":
         run_training(config, args.resume)

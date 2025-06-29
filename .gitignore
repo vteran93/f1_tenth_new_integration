@@ -1,4 +1,5 @@
-examples/ray_results
+# Ignore trained models and checkpoints
+models/
 build/
 gym/f110_gym.egg-info
 __pycache__

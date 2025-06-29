@@ -1,7 +1,8 @@
-buffer_size: 1000000
-learning_starts: 1000
 tau: 0.005
 target_entropy: "auto"
-q_lr: 0.0003
-policy_lr: 0.0003
 alpha_lr: 0.0003
+replay_buffer_config:
+  type: MultiAgentPrioritizedReplayBuffer
+  prioritized_replay_alpha: [alpha]
+  prioritized_replay_beta: [beta]
+  prioritized_replay_eps:  [eps]

@@ -1,19 +1,18 @@
 # --- General experiment settings ---
 experiment_name: f1tenth_multiagent_ppo
 storage_path: ../models # Relative path to store experiment results
-env_config: env.yaml
-ppo_config: ppo.yaml
-sac_config: sac.yaml
+env_config_path: env.yaml
+
+# --- Algorithm configurations ---
+ppo_config_path: ppo.yaml
+sac_config_path: sac.yaml
 
 # --- Training settings ---
 training:
-  algorithm: PPO
+  algorithm: SAC
   reward_function: ProgressRewardEnv
   timesteps_total: 20_000
   eval_interval: 2000
-  gamma: 0.99
-  lr: 0.00005
-  train_batch_size: 4000
 
 # --- Evaluation settings ---
 evaluation:
