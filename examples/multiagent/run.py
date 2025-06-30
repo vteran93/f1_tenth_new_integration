@@ -61,6 +61,10 @@ def get_algorithm_config(config, env_config, policies):
             evaluation_interval=config["training"]["eval_interval"],
             evaluation_num_env_runners=1,
             evaluation_config={"seed": 42},
+        ).env_runners(
+            num_env_runners=14,            # 4 procesos en paralelo
+            num_envs_per_env_runner=14,    # 4 entornos vectorizados por proceso
+            gym_env_vectorize_mode="ASYNC"
         )
         .debugging(seed=42)
     )
@@ -82,7 +86,14 @@ def create_env(config, render_mode=None):
 
 def run_training(config, resume):
     temp_env, env_config = create_env(config)
-    policies = {agent: PolicySpec(None, temp_env.observation_space, temp_env.action_space, {})
+    
+    # Redes neuronales por agente
+    # policies = {agent: PolicySpec(None, temp_env.observation_space, temp_env.action_space, {}) 
+    #             for agent in temp_env.agents}
+    
+    ## Compartimos la red neuronal para todos los agentes
+    policy_learn = PolicySpec(None, temp_env.observation_space, temp_env.action_space, {})
+    policies = {agent: policy_learn 
                 for agent in temp_env.agents}
     temp_env.close()
 

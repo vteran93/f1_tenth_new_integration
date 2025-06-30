@@ -10,7 +10,8 @@ def load_config(path):
         return yaml.safe_load(f)
 
 def init_ray(local_mode=False):
-    ray.init(local_mode=local_mode, ignore_reinit_error=True)
+    ray.init(local_mode=local_mode, ignore_reinit_error=True,  num_cpus=16,                   # fuerza a Ray a usar 16 hilos
+    num_gpus=0)
 
 def get_logger(name, level=logging.INFO):
     logger = logging.getLogger(name)
