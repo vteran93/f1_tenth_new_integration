@@ -1,0 +1,43 @@
+# === F1TENTH Multi-Agent PPO - Complete Configuration ===
+
+# --- General experiment settings ---
+experiment_name: f1tenth_multiagent_PPO
+storage_path: ../models
+
+# --- Training settings ---
+training:
+  algorithm: PPO
+  reward_function: ProgressRewardEnv
+  timesteps_total: 100_000
+  eval_interval: 2000
+  shared_policy: true  # true = shared neural network for all agents, false = individual networks per agent
+
+# --- Evaluation settings ---
+evaluation:
+  episodes: 5
+
+# --- Environment Configuration ---
+# (Merged from env.yaml)
+env_config:
+  map: oval_small
+  num_agents: 2
+  timestep: 0.01
+  num_beams: 36
+  integrator: rk4
+  control_input: 
+    - speed
+    - steering_angle
+  observation_config:
+    type: original
+  reset_config:
+    type: cl_grid_static
+  render_mode: null
+
+# --- PPO Algorithm Configuration ---
+# (Merged from ppo.yaml)
+ppo_config:
+  gamma: 0.99
+  lr: 0.00005
+  train_batch_size: 4000
+  environment:
+    normalize_actions: true

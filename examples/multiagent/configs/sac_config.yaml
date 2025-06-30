@@ -1,0 +1,45 @@
+# === F1TENTH Multi-Agent SAC - Complete Configuration ===
+
+# --- General experiment settings ---
+experiment_name: f1tenth_multiagent_SAC
+storage_path: ../models
+
+# --- Training settings ---
+training:
+  algorithm: SAC
+  reward_function: ProgressRewardEnv
+  timesteps_total: 100_000
+  eval_interval: 2000
+  shared_policy: true  # true = shared neural network for all agents, false = individual networks per agent
+
+# --- Evaluation settings ---
+evaluation:
+  episodes: 5
+
+# --- Environment Configuration ---
+# (Merged from env.yaml)
+env_config:
+  map: oval_small
+  num_agents: 2
+  timestep: 0.01
+  num_beams: 36
+  integrator: rk4
+  control_input: 
+    - speed
+    - steering_angle
+  observation_config:
+    type: original
+  reset_config:
+    type: cl_grid_static
+  render_mode: null
+
+# --- SAC Algorithm Configuration ---
+# (Merged from sac.yaml)
+sac_config:
+  tau: 0.005
+  target_entropy: auto
+  alpha_lr: 0.0003
+  environment:
+    normalize_actions: True # This affects A LOT the performance of the agent
+  replay_buffer_config:
+    type: MultiAgentPrioritizedReplayBuffer
