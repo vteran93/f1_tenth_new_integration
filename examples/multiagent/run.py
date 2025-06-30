@@ -14,8 +14,8 @@ suppress_warnings()
 logger = get_logger(__name__)
 
 ALGO_MAP = {
-    "PPO": (PPOConfig, "ppo_config_path"),
-    "SAC": (SACConfig, "sac_config_path"),
+    "PPO": (PPOConfig, "ppo_config"),
+    "SAC": (SACConfig, "sac_config"),
 }
 
 
@@ -33,13 +33,13 @@ def get_algorithm_config(config, env_config, policies):
 
     AlgoConfigClass, config_key = ALGO_MAP[algorithm_name]
 
-    algo_config_file = load_config(config[config_key])
+    # Get algorithm config from the merged config instead of loading separate file
+    algo_config_file = config.get(config_key, {}).copy()  # Make a copy to avoid mutations
     env_kwargs = algo_config_file.get('environment', {}) 
     
+    # Clean up the config before passing to training
     if 'environment' in algo_config_file:
         del algo_config_file['environment']
-    if 'env_name' in algo_config_file.get('environment',{}):
-        del algo_config_file['environment']['env_name']
         
     algo_config = (
         AlgoConfigClass()
@@ -70,13 +70,14 @@ def get_algorithm_config(config, env_config, policies):
     )
 
     algo_config.training(**algo_config_file)
-
     return algo_config
 
 
 def create_env(config, render_mode=None):
     """Loads environment config and creates an environment instance."""
-    env_config = load_config(config['env_config_path'])
+    # Since environment is always included in the same config, use embedded env_config
+    env_config = config['env_config'].copy()
+    
     if render_mode:
         env_config["render_mode"] = render_mode
 
@@ -87,14 +88,21 @@ def create_env(config, render_mode=None):
 def run_training(config, resume):
     temp_env, env_config = create_env(config)
     
-    # Redes neuronales por agente
-    # policies = {agent: PolicySpec(None, temp_env.observation_space, temp_env.action_space, {}) 
-    #             for agent in temp_env.agents}
+    # Check if we should use shared policy or individual policies per agent
+    shared_policy = config['training'].get('shared_policy', True)  # Default to shared policy
     
-    ## Compartimos la red neuronal para todos los agentes
-    policy_learn = PolicySpec(None, temp_env.observation_space, temp_env.action_space, {})
-    policies = {agent: policy_learn 
-                for agent in temp_env.agents}
+    if shared_policy:
+        # Compartimos la red neuronal para todos los agentes
+        logger.info("Using shared policy for all agents")
+        policy_learn = PolicySpec(None, temp_env.observation_space, temp_env.action_space, {})
+        policies = {agent: policy_learn 
+                    for agent in temp_env.agents}
+    else:
+        # Redes neuronales por agente
+        logger.info("Using individual policies per agent")
+        policies = {agent: PolicySpec(None, temp_env.observation_space, temp_env.action_space, {}) 
+                    for agent in temp_env.agents}
+    
     temp_env.close()
 
     algorithm_name = config['training']['algorithm']
@@ -210,10 +218,9 @@ if __name__ == "__main__":
     def resolve_path(path):
         return path if os.path.isabs(path) else os.path.abspath(os.path.join(CONFIG_DIR, path))
 
-    # Resolve all *_config and storage_path keys
-    for key in list(config.keys()):
-        if key.endswith("_path"):
-            config[key] = resolve_path(config[key])
+    # Resolve storage_path (only this one since algorithm configs are now embedded)
+    if not os.path.isabs(config["storage_path"]):
+        config["storage_path"] = resolve_path(config["storage_path"])
 
     if args.command == "train":
         run_training(config, args.resume)
