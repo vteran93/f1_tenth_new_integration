@@ -1,4 +1,5 @@
 from .multiagent_env import MultiAgentF110
+import numpy as np
 class BaseReward:
     """Base class for reward functions using polymorphism."""
 
@@ -15,6 +16,8 @@ class BaseReward:
         """
         raise NotImplementedError("Subclasses must implement _get_rewards")
 
+
+# Esta funciona
 class ProgressRewardEnv(MultiAgentF110):
     def _get_rewards(self, newly_crashed) -> list:
         """Calculate individual rewards for each agent based on the original F110Env reward function."""
@@ -65,9 +68,6 @@ class ProgressRewardEnv(MultiAgentF110):
         return reward
 
 
-
-
-
 class SpeedRewardEnv(MultiAgentF110):
     def __init__(self, env, timestep=0.1):
         self.env = env 
@@ -77,7 +77,37 @@ class SpeedRewardEnv(MultiAgentF110):
         # Environment timestep for speed calculation
         self.timestep = self.env.config.get("timestep", 0.01)
 
-    def compute_reward(self, agent, current_s, last_s, is_crashed, track_length):
+    def _get_rewards(self, newly_crashed) -> list:
+        """Calculate individual rewards for each agent based on the original F110Env reward function."""
+        
+        # Initialize last_s tracking if not exists (track progress for each agent)
+        if not hasattr(self, '_last_s'):
+            self._last_s = [0.0] * self.env.num_agents
+
+        rewards = []
+        reward = 0.0
+        for i in range(self.env.num_agents):
+            agent = self.agents[i]
+            if agent in self._crashed_agents and agent not in newly_crashed:
+                reward = 0.0
+            else:
+                current_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
+                    self.env.poses_x[i], self.env.poses_y[i]
+                )
+
+                reward = self._compute_reward(agent,
+                    current_s,
+                    self.env.last_s[i],
+                    (agent in newly_crashed),
+                    self.env.track.centerline.spline.s[-1]
+                    )
+            
+            rewards.append(reward)
+        
+        return rewards
+
+
+    def _compute_reward(self, agent, current_s, last_s, is_crashed, track_length):
         """Calculate reward based on speed computed from track progress and crash status.
 
         Speed is calculated in two ways for robustness:
@@ -191,6 +221,7 @@ class SACBasicReward(BaseReward):
         return rewards
 
 
+
 class SACGeminiReward(BaseReward):
     """SAC Gemini reward function (from geminiReward class in multiagent_sac.py)."""
 
@@ -203,51 +234,60 @@ class SACGeminiReward(BaseReward):
         - Enhanced collision penalty
         - Corrected lap completion logic
         """
-        rewards = []
-        track_length = env.env.track.centerline.spline.s[-1]
+        # Initialize last_s tracking if not exists (track progress for each agent)
+        if not hasattr(env, '_last_s'):
+            env._last_s = [0.0] * env.env.num_agents
 
+        rewards = []
         for i in range(env.env.num_agents):
             agent = env.agents[i]
-
-            if agent in env._crashed_agents and agent not in newly_crashed:
-                # Agent was already crashed - no reward
-                reward = 0.0
-            else:
-                # Calculate track progress using centerline spline
-                current_s, _ = env.env.track.centerline.spline.calc_arclength_inaccurate(
-                    env.env.poses_x[i], env.env.poses_y[i]
-                )
-
-                # Calculate progress since last step
-                prog = current_s - env._last_s[i]
-
-                # Correctly handle lap completion (wrap-around)
-                if prog < -0.5 * track_length:
-                    # Crossed finish line going forward
-                    prog += track_length
-                elif prog > 0.5 * track_length:
-                    # Crossed finish line going backward (unlikely but possible)
-                    prog -= track_length
-
-                # Apply rewards based on state
-                if agent in newly_crashed:
-                    # Strong penalty for collision
-                    reward = -5.0
-                else:
-                    # 1. Scaled progress reward (main incentive)
-                    progress_reward = prog * 10.0
-
-                    # 2. Small survival reward for each step not crashed
-                    survival_reward = 0.01
-
-                    reward = progress_reward + survival_reward
-
-                # Update last track position for this agent
-                env._last_s[i] = current_s
-
+            reward = self._compute_reward(env, agent, newly_crashed, i)
             rewards.append(reward)
 
         return rewards
+
+    def _compute_reward(self, env, agent, newly_crashed, i):
+        """Compute SAC Gemini reward for individual agent."""
+        track_length = env.env.track.centerline.spline.s[-1]
+
+        if agent in env._crashed_agents and agent not in newly_crashed:
+            # Agent was already crashed - no reward
+            reward = 0.0
+        else:
+            # Calculate track progress using centerline spline
+            current_s, _ = env.env.track.centerline.spline.calc_arclength_inaccurate(
+                env.env.poses_x[i], env.env.poses_y[i]
+            )
+
+            # Calculate progress since last step
+            prog = current_s - env._last_s[i]
+
+            # Correctly handle lap completion (wrap-around)
+            if prog < -0.5 * track_length:
+                # Crossed finish line going forward
+                prog += track_length
+            elif prog > 0.5 * track_length:
+                # Crossed finish line going backward (unlikely but possible)
+                prog -= track_length
+
+            # Apply rewards based on state
+            if agent in newly_crashed:
+                # Strong penalty for collision
+                reward = -5.0
+            else:
+                # 1. Scaled progress reward (main incentive)
+                progress_reward = prog * 10.0
+
+                # 2. Small survival reward for each step not crashed
+                survival_reward = 0.01
+
+                reward = progress_reward + survival_reward
+
+            # Update last track position for this agent
+            env._last_s[i] = current_s
+
+        return reward
+
 
 
 class SpeedReward(BaseReward):
@@ -290,6 +330,55 @@ class SpeedReward(BaseReward):
 
 
 class SafetyReward(BaseReward):
+    """Safety-focused reward encouraging careful driving."""
+
+    def _get_rewards(self, env, newly_crashed):
+        """Reward emphasizing safety with distance to walls."""
+        # Initialize last_s tracking if not exists (track progress for each agent)
+        if not hasattr(env, '_last_s'):
+            env._last_s = [0.0] * env.env.num_agents
+
+        rewards = []
+        for i in range(env.env.num_agents):
+            agent = env.agents[i]
+            reward = self._compute_reward(env, agent, newly_crashed, i)
+            rewards.append(reward)
+
+        return rewards
+
+    def _compute_reward(self, env, agent, newly_crashed, i):
+        """Compute safety-focused reward for individual agent."""
+        if agent in env._crashed_agents and agent not in newly_crashed:
+            # Agent was already crashed - no reward calculation needed
+            reward = 0.0
+        else:
+            # Progress component (reduced weight)
+            current_s, _ = env.env.track.centerline.spline.calc_arclength_inaccurate(
+                env.env.poses_x[i], env.env.poses_y[i]
+            )
+            prog = current_s - env._last_s[i]
+
+            # Handle lap completion (when current_s wraps around to beginning)
+            if prog > 0.9 * env.env.track.centerline.spline.s[-1]:
+                prog = (env.env.track.centerline.spline.s[-1] - env._last_s[i]) + current_s
+
+            # Safety component (minimum distance to walls)
+            min_scan_distance = np.min(env.env.scans[i])
+            safety_reward = min_scan_distance * 0.5  # Reward staying away from walls
+
+            # Combined reward
+            base_reward = prog * 0.5 + safety_reward
+
+            # Apply collision penalty
+            if agent in newly_crashed:
+                reward = base_reward - 5.0  # Large collision penalty
+            else:
+                reward = base_reward
+
+            # Update last track position for this agent
+            env._last_s[i] = current_s
+
+        return reward
     """Safety-focused reward encouraging careful driving."""
 
     def _get_rewards(self, env, newly_crashed):
