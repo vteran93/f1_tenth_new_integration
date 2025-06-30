@@ -3,7 +3,7 @@
 # This are the anchors used to avoid repetition in the YAML file.
 # Anchors are used to define common configurations that can be reused across different experiments.
 training: &training
-  timesteps_total: 100_000
+  timesteps_total: 3_000_000
   eval_interval:    2000
   reward_function:  ProgressRewardEnv
 
@@ -36,7 +36,7 @@ sac_params: &sac_params
 
 # ——— List of experiments ———
 experiments:
-  - name: PPO_Shared_Policy
+  - name: oval_small_PPO_Shared_Policy
     storage_path: ../models
     training:
       <<: *training
@@ -49,7 +49,7 @@ experiments:
     ppo_params:
       <<: *ppo_params
 
-  - name: PPO_Individual_Policies
+  - name: oval_small_PPO_Individual_Policies
     storage_path: ../models
     training:
       <<: *training
@@ -62,7 +62,7 @@ experiments:
     ppo_params:
       <<: *ppo_params
 
-  - name: SAC_Shared_Policy
+  - name: oval_small_SAC_Shared_Policy
     storage_path: ../models
     training:
       <<: *training
@@ -75,7 +75,7 @@ experiments:
     sac_params:
       <<: *sac_params
 
-  - name: SAC_Individual_Policies
+  - name: oval_small_SAC_Individual_Policies
     storage_path: ../models
     training:
       <<: *training
@@ -85,5 +85,229 @@ experiments:
       <<: *evaluation
     env:
       <<: *env
+    sac_params:
+      <<: *sac_params
+
+  - name: Spielberg_PPO_Shared_Policy
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: true
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Spielberg_PPO_Individual_Policies
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Spielberg_SAC_Shared_Policy
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: true
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    sac_params:
+      <<: *sac_params
+
+  - name: Spielberg_SAC_Individual_Policies
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    sac_params:
+      <<: *sac_params
+
+  - name: Monza_PPO_Shared_Policy_Convergence
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: true
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Monza_PPO_Individual_Policies_Convergence
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    ppo_params:
+      <<: *ppo_params
+  
+  - name: Monza_SAC_Shared_Policy_Convergence
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: true
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    sac_params:
+      <<: *sac_params
+
+  - name: Monza_SAC_Individual_Policies_Convergence
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    sac_params:
+      <<: *sac_params
+
+  - name: Catalunya_PPO_Shared_Policy_Convergence
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: true
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Catalunya
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Catalunya_PPO_Individual_Policies_Convergence
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Catalunya
+    ppo_params:
+      <<: *ppo_params
+  
+  - name: Catalunya_SAC_Shared_Policy_Convergence
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: true
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Catalunya
+    sac_params:
+      <<: *sac_params
+
+  - name: Catalunya_SAC_Individual_Policies_Convergence
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Catalunya
+    sac_params:
+      <<: *sac_params
+
+  - name: Silverstone_PPO_Shared_Policy_Convergence
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: true
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Silverstone
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Silverstone_PPO_Individual_Policies_Convergence
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Silverstone
+    ppo_params:
+      <<: *ppo_params
+  
+  - name: Silverstone_SAC_Shared_Policy_Convergence
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: true
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Silverstone
+    sac_params:
+      <<: *sac_params
+
+  - name: Silverstone_SAC_Individual_Policies_Convergence
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Silverstone
     sac_params:
       <<: *sac_params

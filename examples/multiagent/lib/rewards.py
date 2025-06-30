@@ -48,6 +48,9 @@ class ProgressRewardEnv(MultiAgentF110):
             current_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
                 self.env.poses_x[i], self.env.poses_y[i]
             )
+            # TODO Argument of type "ndarray[Any, dtype[float64]] | Unknown" cannot be assigned to parameter "x" of type "float" in function "calc_arclength_inaccurate"
+#   Type "ndarray[Any, dtype[float64]] | Unknown" is not assignable to type "float"
+#     "ndarray[Any, dtype[float64]]" is not assignable to "float"
 
             # Calculate progress since last step
             prog = current_s - self._last_s[i]
