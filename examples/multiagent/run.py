@@ -1,6 +1,7 @@
 import argparse
 import importlib
 import os
+import shutil
 from lib.utils import load_config, init_ray, get_logger, suppress_warnings, get_experiment_path, get_best_checkpoint
 from ray import tune
 from ray.rllib.algorithms.ppo import PPOConfig
@@ -8,6 +9,7 @@ from ray.rllib.algorithms.sac import SACConfig
 from ray.rllib.policy.policy import PolicySpec
 from ray.rllib.algorithms.algorithm import Algorithm
 from ray.tune.analysis import ExperimentAnalysis
+from ray.tune.callback import Callback
 import datetime
 
 suppress_warnings()
@@ -126,6 +128,7 @@ def run_training(config, resume):
         name=config["experiment_name"],
         resume=resume,
         trial_name_creator= lambda trial: f"{trial.trainable_name}_{reward_function}_{trial.trial_id}_{trial.restore_path}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}",
+        callbacks=[SaveConfigCallback(args.config_path)],  # Add the callback here
     )
 
 
@@ -190,6 +193,19 @@ def run_evaluation(config, run_name=None):
 
     env.close()
     logger.info(f"All {num_episodes} evaluation episodes finished.")
+
+
+class SaveConfigCallback(Callback):
+    def __init__(self, config_path):
+        self.config_path = config_path
+        self.filename = os.path.basename(config_path)
+
+    def on_trial_start(self, iteration, trials, trial, **info):
+        """Called when a trial starts."""
+        trial_dir = trial.local_dir
+        destination_path = os.path.join(trial_dir, self.filename)
+        shutil.copy(self.config_path, destination_path)
+        logger.info(f"Copied config '{self.config_path}' to '{destination_path}'")
 
 
 if __name__ == "__main__":
