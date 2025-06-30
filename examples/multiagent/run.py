@@ -10,6 +10,7 @@ from ray.rllib.policy.policy import PolicySpec
 from ray.rllib.algorithms.algorithm import Algorithm
 from ray.tune.analysis import ExperimentAnalysis
 from ray.tune.callback import Callback
+from ray.tune.stopper import TrialPlateauStopper # Importar el Stopper
 import datetime
 
 suppress_warnings()
@@ -114,16 +115,28 @@ def run_training(config):
     temp_env.close()
 
     algorithm_name = config['training']['algorithm']
-    # Pasamos la función de mapeo correcta a la configuración del algoritmo
     config_algo = get_algorithm_config(config, env_config, policies, policy_mapping_fn)
     
-    # Create callback to save resolved config
+    # Crear callback para guardar la configuración
     save_config_callback = SaveConfigCallback(config)
+
+    # Definir el stopper para la convergencia.
+    # Detendrá el trial si la desviación estándar de la recompensa en los últimos
+    # 20 resultados es muy baja, indicando un estancamiento.
+    # No se detendrá ningún trial antes de las primeras 20 iteraciones.
+    stopper = TrialPlateauStopper(
+        metric="episode_reward_mean",
+        std=0.01,          # Desviación estándar muy baja para considerar estancamiento.
+        num_results=20,    # Ventana de resultados para calcular la desviación.
+        grace_period=20,   # No detener antes de 20 iteraciones.
+        mode="max",
+    )
 
     tune.run(
         algorithm_name,
         config=config_algo.to_dict(),
-        stop={"timesteps_total": config["training"]["timesteps_total"]},
+        # Pasamos el stopper aquí. Se combinará con timesteps_total.
+        stop=stopper,
         checkpoint_config=tune.CheckpointConfig(
             checkpoint_score_attribute="episode_reward_mean",
             checkpoint_score_order="max",
@@ -177,6 +190,9 @@ def run_evaluation(config, trial_name=None):
 
     env, _ = create_env(config, render_mode="human")
 
+    # Determinar si el modelo se entrenó con una política compartida
+    shared_policy = config['training'].get('shared_policy', True)
+
     num_episodes = config.get("evaluation", {}).get("episodes", 5)
     for eval_num in range(1, num_episodes + 1):
         logger.info(f"=== Starting evaluation episode {eval_num}/{num_episodes} ===")
@@ -186,9 +202,11 @@ def run_evaluation(config, trial_name=None):
         while not terminated["__all__"]:
             actions = {}
             for agent_id, agent_obs in obs.items():
+                # Usar el ID de política correcto según la configuración del experimento
+                policy_id = "shared_policy" if shared_policy else agent_id
                 actions[agent_id] = algo.compute_single_action(
                     observation=agent_obs,
-                    policy_id=agent_id,
+                    policy_id=policy_id,
                     explore=False
                 )
             obs, reward, terminated, truncated, info = env.step(actions)
