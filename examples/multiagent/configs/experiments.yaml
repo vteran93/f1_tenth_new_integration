@@ -1,0 +1,86 @@
+# ——— Definición de anchors ———
+training: &training
+  timesteps_total: 100_000
+  eval_interval:    2000
+  reward_function:  ProgressRewardEnv
+
+evaluation: &evaluation
+  episodes: 5
+
+env: &env
+  map:               oval_small
+  num_agents:        2
+  timestep:          0.01
+  num_beams:         36
+  integrator:        rk4
+  control_input:     [speed, steering_angle]
+  observation_config: { type: original }
+  reset_config:       { type: cl_grid_static }
+  render_mode:        null
+
+ppo_config: &ppo_config
+  gamma:            0.99
+  lr:               0.00005
+  train_batch_size: 4000
+  environment:      { normalize_actions: true }
+
+sac_config: &sac_config
+  tau:                   0.005
+  target_entropy:        auto
+  alpha_lr:              0.0003
+  environment:           { normalize_actions: true }
+  replay_buffer_config:  { type: MultiAgentPrioritizedReplayBuffer }
+
+# ——— Lista de experimentos ———
+experiments:
+  - name: PPO_Shared_Policy
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: true
+    evaluation:
+      <<: *evaluation
+    env_config:
+      <<: *env
+    ppo_config:
+      <<: *ppo_config
+
+  - name: PPO_Individual_Policies
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+    evaluation:
+      <<: *evaluation
+    env_config:
+      <<: *env
+    ppo_config:
+      <<: *ppo_config
+
+  - name: SAC_Shared_Policy
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: true
+    evaluation:
+      <<: *evaluation
+    env_config:
+      <<: *env
+    sac_config:
+      <<: *sac_config
+
+  - name: SAC_Individual_Policies
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+    evaluation:
+      <<: *evaluation
+    env_config:
+      <<: *env
+    sac_config:
+      <<: *sac_config
