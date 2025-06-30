@@ -278,6 +278,7 @@ def main():
     logger.info(f"Total training sessions: {total_trainings}")
     logger.info(f"Timesteps per training: {args.timesteps}")
     logger.info(f"Algorithms: {args.algorithms}")
+    
     logger.info(f"Reward functions: {[rf[0] for rf in reward_functions]}")
     logger.info(f"Models will be saved to: {args.storage_path}")
     logger.info("=" * 70)
@@ -285,7 +286,7 @@ def main():
     # Run training for each combination
     for algorithm in args.algorithms:
         for reward_func, source_file, base_class in reward_functions:
-            training_id = f"{algorithm}_{reward_func}"
+            training_id = f"{source_file}_{algorithm}_{reward_func}"
             logger.info(f"\n📊 Training {completed_trainings + 1}/{total_trainings}: {training_id}")
             logger.info(f"Source: {source_file} (inherits from {base_class})")
 
