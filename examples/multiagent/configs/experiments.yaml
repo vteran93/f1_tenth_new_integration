@@ -1,4 +1,7 @@
-# ——— Definición de anchors ———
+# ——— Anchors definitions ———
+# This file defines the configuration for multiple experiments in a multi-agent reinforcement learning setup.
+# This are the anchors used to avoid repetition in the YAML file.
+# Anchors are used to define common configurations that can be reused across different experiments.
 training: &training
   timesteps_total: 100_000
   eval_interval:    2000
@@ -18,20 +21,20 @@ env: &env
   reset_config:       { type: cl_grid_static }
   render_mode:        null
 
-ppo_config: &ppo_config
+ppo_params: &ppo_params
   gamma:            0.99
   lr:               0.00005
   train_batch_size: 4000
   environment:      { normalize_actions: true }
 
-sac_config: &sac_config
+sac_params: &sac_params
   tau:                   0.005
   target_entropy:        auto
   alpha_lr:              0.0003
   environment:           { normalize_actions: true }
   replay_buffer_config:  { type: MultiAgentPrioritizedReplayBuffer }
 
-# ——— Lista de experimentos ———
+# ——— List of experiments ———
 experiments:
   - name: PPO_Shared_Policy
     storage_path: ../models
@@ -41,10 +44,10 @@ experiments:
       shared_policy: true
     evaluation:
       <<: *evaluation
-    env_config:
+    env:
       <<: *env
-    ppo_config:
-      <<: *ppo_config
+    ppo_params:
+      <<: *ppo_params
 
   - name: PPO_Individual_Policies
     storage_path: ../models
@@ -54,10 +57,10 @@ experiments:
       shared_policy: false
     evaluation:
       <<: *evaluation
-    env_config:
+    env:
       <<: *env
-    ppo_config:
-      <<: *ppo_config
+    ppo_params:
+      <<: *ppo_params
 
   - name: SAC_Shared_Policy
     storage_path: ../models
@@ -67,10 +70,10 @@ experiments:
       shared_policy: true
     evaluation:
       <<: *evaluation
-    env_config:
+    env:
       <<: *env
-    sac_config:
-      <<: *sac_config
+    sac_params:
+      <<: *sac_params
 
   - name: SAC_Individual_Policies
     storage_path: ../models
@@ -80,7 +83,7 @@ experiments:
       shared_policy: false
     evaluation:
       <<: *evaluation
-    env_config:
+    env:
       <<: *env
-    sac_config:
-      <<: *sac_config
+    sac_params:
+      <<: *sac_params

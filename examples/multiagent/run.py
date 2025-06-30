@@ -16,8 +16,8 @@ suppress_warnings()
 logger = get_logger(__name__)
 
 ALGO_MAP = {
-    "PPO": (PPOConfig, "ppo_config"),
-    "SAC": (SACConfig, "sac_config"),
+    "PPO": (PPOConfig, "ppo_params"),
+    "SAC": (SACConfig, "sac_params"),
 }
 
 
@@ -27,7 +27,7 @@ def get_reward_class(config):
     return getattr(reward_module, reward_function_name)
 
 
-def get_algorithm_config(config, env_config, policies):
+def get_algorithm_config(config, env_config, policies, policy_mapping_fn):
     algorithm_name = config['training']['algorithm']
 
     if algorithm_name not in ALGO_MAP:
@@ -57,7 +57,7 @@ def get_algorithm_config(config, env_config, policies):
         )
         .multi_agent(
             policies=policies,
-            policy_mapping_fn=lambda agent_id, *args, **kwargs: agent_id,
+            policy_mapping_fn=policy_mapping_fn,
         )
         .evaluation(
             evaluation_interval=config["training"]["eval_interval"],
@@ -78,7 +78,7 @@ def get_algorithm_config(config, env_config, policies):
 def create_env(config, render_mode=None):
     """Loads environment config and creates an environment instance."""
     # Since environment is always included in the same config, use embedded env_config
-    env_config = config['env_config'].copy()
+    env_config = config['env'].copy()
     
     if render_mode:
         env_config["render_mode"] = render_mode
@@ -87,7 +87,7 @@ def create_env(config, render_mode=None):
     return reward_class(env_config=env_config), env_config
 
 
-def run_training(config, resume):
+def run_training(config):
     temp_env, env_config = create_env(config)
     
     # Check if we should use shared policy or individual policies per agent
@@ -96,22 +96,29 @@ def run_training(config, resume):
     if shared_policy:
         # Compartimos la red neuronal para todos los agentes
         logger.info("Using shared policy for all agents")
-        policy_learn = PolicySpec(None, temp_env.observation_space, temp_env.action_space, {})
-        policies = {agent: policy_learn 
-                    for agent in temp_env.agents}
+        # Usamos un único nombre de política para que todos los agentes la compartan
+        shared_policy_name = "shared_policy"
+        policies = {
+            shared_policy_name: PolicySpec(None, temp_env.observation_space, temp_env.action_space, {})
+        }
+        policy_mapping_fn = lambda agent_id, *args, **kwargs: shared_policy_name
     else:
         # Redes neuronales por agente
         logger.info("Using individual policies per agent")
-        policies = {agent: PolicySpec(None, temp_env.observation_space, temp_env.action_space, {}) 
-                    for agent in temp_env.agents}
+        policies = {
+            agent: PolicySpec(None, temp_env.observation_space, temp_env.action_space, {}) 
+            for agent in temp_env.agents
+        }
+        policy_mapping_fn = lambda agent_id, *args, **kwargs: agent_id
     
     temp_env.close()
 
     algorithm_name = config['training']['algorithm']
-    config_algo = get_algorithm_config(config, env_config, policies)
- 
-    global reward_function 
-    reward_function = config['training']['reward_function']
+    # Pasamos la función de mapeo correcta a la configuración del algoritmo
+    config_algo = get_algorithm_config(config, env_config, policies, policy_mapping_fn)
+    
+    # Create callback to save resolved config
+    save_config_callback = SaveConfigCallback(config)
 
     tune.run(
         algorithm_name,
@@ -125,41 +132,38 @@ def run_training(config, resume):
             checkpoint_frequency=10
         ),
         storage_path=config["storage_path"],
-        name=config["experiment_name"],
-        resume=resume,
-        trial_name_creator= lambda trial: f"{trial.trainable_name}_{reward_function}_{trial.trial_id}_{trial.restore_path}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}",
-        callbacks=[SaveConfigCallback(args.config_path)],  # Add the callback here
+        name=config["name"],
+        resume="AUTO+ERRORED",
+        callbacks=[save_config_callback],
     )
 
 
-def run_evaluation(config, run_name=None):
+def run_evaluation(config, trial_name=None):
     logger.info("Starting evaluation...")
-    experiment_path = get_experiment_path(config["experiment_name"], config["storage_path"])
+    experiment_path = get_experiment_path(config["name"], config["storage_path"])
 
     logger.info(f"Loading results from: {experiment_path}")
     analysis = ExperimentAnalysis(experiment_path)
     
-    if run_name:
-        # Filter trials by run_name pattern - check both trial_id and the full directory path
+    if trial_name:
+        # Filter trials by trial_name pattern
         filtered_trials = []
         for trial in analysis.trials:
-            # Check if run_name matches either the trial_id or any part of the full path
             trial_path = trial.local_dir if hasattr(trial, 'local_dir') else ''
-            if (run_name in trial.trial_id or 
-                run_name in trial_path):
+            if (trial_name in trial.trial_id or 
+                trial_name in trial_path):
                 filtered_trials.append(trial)
         
         if not filtered_trials:
-            logger.error(f"No trials found matching run name: {run_name}")
-            available_names = []
-            for trial in analysis.trials:
-                trial_path = trial.local_dir if hasattr(trial, 'local_dir') else 'N/A'
-                available_names.append(f"ID: {trial.trial_id}, Path: {trial_path}")
-            logger.info(f"Available trials: {available_names}")
+            logger.error(f"No trials found matching trial name: {trial_name}")
+            available_names = [trial.trial_id for trial in analysis.trials]
+            logger.info(f"Available trial IDs: {available_names}")
             return
-        # Create a new analysis with filtered trials
+        
         analysis.trials = filtered_trials
-        logger.info(f"Found {len(filtered_trials)} trial(s) matching '{run_name}'")
+        logger.info(f"Found {len(filtered_trials)} trial(s) matching '{trial_name}'")
+    else:
+        logger.info("No specific trial specified, using best trial from experiment")
     
     best_checkpoint = get_best_checkpoint(analysis)
 
@@ -196,49 +200,93 @@ def run_evaluation(config, run_name=None):
 
 
 class SaveConfigCallback(Callback):
-    def __init__(self, config_path):
-        self.config_path = config_path
-        self.filename = os.path.basename(config_path)
+    def __init__(self, resolved_config):
+        self.resolved_config = resolved_config
 
-    def on_trial_start(self, iteration, trials, trial, **info):
-        """Called when a trial starts."""
-        trial_dir = trial.local_dir
-        destination_path = os.path.join(trial_dir, self.filename)
-        shutil.copy(self.config_path, destination_path)
-        logger.info(f"Copied config '{self.config_path}' to '{destination_path}'")
+    def setup(self, stop=None, num_samples=None, total_num_samples=None, **info):
+        """Called once at the very beginning of training."""
+        import yaml
+        
+        # Save config to the experiment's storage path
+        experiment_name = self.resolved_config["name"]
+        storage_path = self.resolved_config["storage_path"]
+        experiment_dir = os.path.join(storage_path, experiment_name)
+        
+        # Create experiment directory if it doesn't exist
+        os.makedirs(experiment_dir, exist_ok=True)
+        
+        config_file_path = os.path.join(experiment_dir, f"{experiment_name}_config.yaml")
+        
+        with open(config_file_path, 'w') as f:
+            yaml.dump(self.resolved_config, f, default_flow_style=False, indent=2)
+        
+        logger.info(f"Saved resolved experiment config to: {config_file_path}")
+
+def setup_experiment_config(experiment, config_dir):
+    """Setup experiment configuration with resolved paths."""
+    config = experiment.copy()
+    
+    # Resolve relative paths
+    if not os.path.isabs(config["storage_path"]):
+        config["storage_path"] = os.path.abspath(os.path.join(config_dir, config["storage_path"]))
+    
+    return config
+
+
+def find_experiment(experiments, experiment_name):
+    """Find experiment by name and return it, or exit with error if not found."""
+    experiment = next((e for e in experiments if e["name"] == experiment_name), None)
+    if not experiment:
+        available = [e["name"] for e in experiments]
+        logger.error(f"Experiment '{experiment_name}' not found. Available: {available}")
+        exit(1)
+    return experiment
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run F1TENTH multi-agent training or evaluation.")
-    parser.add_argument("--config_path", default="configs/run.yaml", help="Path to the run config file")
+    parser.add_argument("--config", default="configs/experiments.yaml", help="Path to experiments config file")
 
     # Create subparsers for train and eval commands
     subparsers = parser.add_subparsers(dest="command", help="Available commands", required=True)
 
-    # Create the parser for the "train" command
+    # Train command
     parser_train = subparsers.add_parser("train", help="Train the model")
-    parser_train.add_argument("--resume", action="store_true", help="Resume training from a checkpoint")
+    parser_train.add_argument("--experiment", type=str, help="Name of the experiment to run")
+    parser_train.add_argument("--all", action="store_true", help="Run all experiments")
 
-    # Create the parser for the "eval" command
+    # Eval command
     parser_eval = subparsers.add_parser("eval", help="Evaluate the model")
-    # Add an optional argument to specify the run to evaluate
-    parser_eval.add_argument("--run_name", type=str, help="Name of the run to evaluate")
+    parser_eval.add_argument("--experiment", type=str, required=True, help="Name of the experiment to evaluate")
+    parser_eval.add_argument("--trial", type=str, help="Specific trial to evaluate (optional, uses best trial if not specified)")
 
     args = parser.parse_args()
 
-    CONFIG_DIR = os.path.dirname(os.path.abspath(args.config_path))
-    config = load_config(args.config_path)
+    # Load experiments config
+    config_dir = os.path.dirname(os.path.abspath(args.config))
+    config_data = load_config(args.config)
+    experiments = config_data["experiments"]
+    
     init_ray()
 
-    # Helper to resolve a path relative to CONFIG_DIR
-    def resolve_path(path):
-        return path if os.path.isabs(path) else os.path.abspath(os.path.join(CONFIG_DIR, path))
-
-    # Resolve storage_path (only this one since algorithm configs are now embedded)
-    if not os.path.isabs(config["storage_path"]):
-        config["storage_path"] = resolve_path(config["storage_path"])
-
     if args.command == "train":
-        run_training(config, args.resume)
+        if args.all:
+            # Run all experiments
+            for experiment in experiments:
+                config = setup_experiment_config(experiment, config_dir)
+                logger.info(f"Running experiment: {experiment['name']}")
+                run_training(config)
+        elif args.experiment:
+            # Run specific experiment
+            experiment = find_experiment(experiments, args.experiment)
+            config = setup_experiment_config(experiment, config_dir)
+            run_training(config)
+        else:
+            logger.error("Please specify --experiment <name> or --all")
+            exit(1)
+            
     elif args.command == "eval":
-        run_evaluation(config, args.run_name)
+        # Evaluate specific experiment
+        experiment = find_experiment(experiments, args.experiment)
+        config = setup_experiment_config(experiment, config_dir)
+        run_evaluation(config, args.trial)
