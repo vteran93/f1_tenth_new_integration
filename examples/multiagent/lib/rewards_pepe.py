@@ -1,21 +1,31 @@
+import warnings
 from .multiagent_env import MultiAgentF110
-from abc import ABC, abstractmethod
 import numpy as np
+
+# Define deprecated decorator if not available
+try:
+    from warnings import deprecated
+except ImportError:
+    def deprecated(func):
+        """Fallback deprecated decorator for older Python versions."""
+        def wrapper(*args, **kwargs):
+            warnings.warn(f"{func.__name__} is deprecated", DeprecationWarning, stacklevel=2)
+            return func(*args, **kwargs)
+        return wrapper
 
 # Abstract base class for defining reward functions in a multi-agent F1TENTH environment.
 # This class ensures all reward functions follow a consistent interface for computing
 # rewards for individual agents, making it easy to add new reward strategies.
 
 
-class RewardFunction(ABC, MultiAgentF110, ):
+class RewardFunction(MultiAgentF110):
     """Abstract base class for reward functions."""
 
-    def __init__(self, env):
+    def __init__(self, env_config=None):
+        super().__init__(env_config=env_config)
         # Store the F1TENTH environment instance to access state information
         # (e.g., positions, speeds, track data) needed for reward computation.
-        self.env = env
 
-    @abstractmethod
     def _compute_reward(self, agent, newly_crashed, i):
         """Compute reward for a single agent.
 
@@ -27,11 +37,11 @@ class RewardFunction(ABC, MultiAgentF110, ):
         Returns:
             float: The computed reward for the agent.
         """
-        pass
+        raise NotImplementedError("Subclasses must implement _compute_reward")
 
     def _get_rewards(self, newly_crashed) -> list:
         """Calculate individual rewards for each agent based on the original F110Env reward function."""
-        
+
         # Initialize last_s tracking if not exists (track progress for each agent)
         if not hasattr(self, '_last_s'):
             self._last_s = [0.0] * self.env.num_agents
@@ -39,11 +49,11 @@ class RewardFunction(ABC, MultiAgentF110, ):
         rewards = []
         for i in range(self.env.num_agents):
             agent = self.agents[i]
-            
+
             reward = self._compute_reward(agent, newly_crashed, i)
-            
+
             rewards.append(reward)
-        
+
         return rewards
 
 # Reward function that encourages track progress and survival.
@@ -51,11 +61,11 @@ class RewardFunction(ABC, MultiAgentF110, ):
 # rewarding agents for moving forward along the track while penalizing crashes.
 
 
-class GeminiReward(RewardFunction, MultiAgentF110):
+class GeminiReward(RewardFunction):
     """Reward function based on track progress and survival (original geminiReward)."""
 
-    def __init__(self, env):
-        super().__init__(env)
+    def __init__(self, env_config=None):
+        super().__init__(env_config=env_config)
         # Initialize last_s tracking for each agent
         if not hasattr(self, '_last_s'):
             self._last_s = [0.0] * self.env.num_agents
@@ -115,12 +125,12 @@ class GeminiReward(RewardFunction, MultiAgentF110):
 # progress along the track, providing meaningful rewards for aggressive driving.
 
 
-class SpeedReward(RewardFunction, MultiAgentF110):
+class SpeedReward(RewardFunction):
     """Reward function focused on encouraging higher speeds with crash penalties."""
 
-    def __init__(self, env):
+    def __init__(self, env_config=None):
         """Initialize the SpeedReward with environment reference and tracking variables."""
-        super().__init__(env)
+        super().__init__(env_config=env_config)
         # Initialize last_s tracking for each agent
         if not hasattr(self, '_last_s'):
             self._last_s = [0.0] * self.env.num_agents
@@ -231,16 +241,16 @@ class SpeedReward(RewardFunction, MultiAgentF110):
 # and deviations from the centerline.
 
 
-class WaypointReward(RewardFunction, MultiAgentF110):
+class WaypointReward(RewardFunction):
     """Reward function that rewards agents for passing arc length thresholds."""
 
-    def __init__(self, env):
+    def __init__(self, env_config=None):
         """Initialize the reward function with environment and waypoint data.
 
         Args:
-            env: The F1TENTH environment instance, providing access to track data.
+            env_config: The environment configuration dictionary.
         """
-        super().__init__(env)
+        super().__init__(env_config=env_config)
         # Initialize last_s tracking for each agent
         if not hasattr(self, '_last_s'):
             self._last_s = [0.0] * self.env.num_agents
@@ -340,16 +350,16 @@ class WaypointReward(RewardFunction, MultiAgentF110):
 # opponents, maintaining speed, and avoiding collisions or risky proximity.
 
 
-class CompetitiveOvertakingReward(RewardFunction, MultiAgentF110):
+class CompetitiveOvertakingReward(RewardFunction):
     """Reward function for competitive racing with lap completion and overtaking."""
 
-    def __init__(self, env):
+    def __init__(self, env_config=None):
         """Initialize the reward function with environment and tracking data.
 
         Args:
-            env: The F1TENTH environment instance, providing access to track and agent data.
+            env_config: The environment configuration dictionary.
         """
-        super().__init__(env)
+        super().__init__(env_config=env_config)
         # Initialize last_s tracking for each agent
         if not hasattr(self, '_last_s'):
             self._last_s = [0.0] * self.env.num_agents
@@ -469,10 +479,11 @@ class CompetitiveOvertakingReward(RewardFunction, MultiAgentF110):
 
         return reward
 
+
 # Factory function to create instances of reward functions based on configuration.
 # This allows the main script to dynamically select reward functions for each agent
 # as specified in config.yaml, making the system flexible and extensible.
-from warnings import deprecated
+
 
 @deprecated
 def get_reward_function(reward_name, env):
