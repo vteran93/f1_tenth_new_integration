@@ -22,7 +22,8 @@ class MultiAgentF110(MultiAgentEnv, ABC):
     def __init__(self, env_config=None):
         # Called when the environment is created.
         super().__init__()
-        self.env = F110Env(config=env_config or {}, render_mode=env_config.get("render_mode"))
+        env_config = env_config or {}
+        self.env = F110Env(config=env_config, render_mode=env_config.get("render_mode"))
         self.agents = [f"agent_{i}" for i in range(self.env.num_agents)]
         self._last_positions = [(0.0, 0.0)] * self.env.num_agents
         self._crashed_agents = set()  # Track which agents have crashed
@@ -51,7 +52,7 @@ class MultiAgentF110(MultiAgentEnv, ABC):
             else:
                 filtered_actions.append(action_dict.get(agent, np.zeros_like(self.env.action_space.low[0])))
         
-        actions = np.array(filtered_actions)
+        actions = np.asarray(filtered_actions)
         obs, _, terminated, truncated, info = self.env.step(actions)
 
         # Track newly crashed agents this step
@@ -62,7 +63,6 @@ class MultiAgentF110(MultiAgentEnv, ABC):
                 newly_crashed.add(agent)
                 self._crashed_agents.add(agent)
 
-        
         # Calculate rewards and metrics
         rewards = self._get_rewards(newly_crashed)
         lap_progress = self._calculate_lap_progress()
@@ -77,16 +77,16 @@ class MultiAgentF110(MultiAgentEnv, ABC):
         terminated_dict = {}
         
         for i, agent in enumerate(self.agents):
-            if agent not in self._crashed_agents:
-                # Agent is still active
-                obs_dict[agent] = full_obs_dict[agent]
-                rew_dict[agent] = rewards[i]
-                terminated_dict[agent] = False
-            elif agent in newly_crashed:
+            if agent in newly_crashed:
                 # Agent just crashed this step - include final observation and reward
                 obs_dict[agent] = full_obs_dict[agent]
                 rew_dict[agent] = rewards[i]
                 terminated_dict[agent] = True
+            elif agent not in self._crashed_agents:
+                # Agent is still active
+                obs_dict[agent] = full_obs_dict[agent]
+                rew_dict[agent] = rewards[i]
+                terminated_dict[agent] = False
             # Note: Previously crashed agents are not included in any dict
 
         # Episode ends when ALL agents have crashed
@@ -137,12 +137,24 @@ class MultiAgentF110(MultiAgentEnv, ABC):
         single_spaces = {}
         for key, space in orig_spaces.items():
             if key == 'ego_idx':
-                single_spaces[key] = gym.spaces.Box(low=0, high=space.n-1, shape=(), dtype=np.int32)
+                # Keep ego_idx as Discrete space (not Box)
+                single_spaces[key] = space
             elif hasattr(space, 'shape') and len(space.shape) > 0 and space.shape[0] == self.env.num_agents:
                 if key == 'scans':
-                    single_spaces[key] = gym.spaces.Box(low=space.low.min(), high=space.high.max(), shape=(space.shape[1],), dtype=space.dtype)
+                    # Extract single-agent scan space (create bounds directly as float32)
+                    scan_shape = (space.shape[1],)
+                    low_val = np.float32(space.low[0].min())
+                    high_val = np.float32(space.high[0].max())
+                    single_spaces[key] = gym.spaces.Box(
+                        low=low_val, high=high_val, shape=scan_shape, dtype=np.float32
+                    )
                 else:
-                    single_spaces[key] = gym.spaces.Box(low=space.low.min(), high=space.high.max(), shape=(), dtype=space.dtype)
+                    # Scalar observations (create bounds directly as float32)
+                    low_val = np.float32(space.low[0])
+                    high_val = np.float32(space.high[0])
+                    single_spaces[key] = gym.spaces.Box(
+                        low=low_val, high=high_val, shape=(), dtype=np.float32
+                    )
             else:
                 single_spaces[key] = space
         return gym.spaces.Dict(single_spaces)
@@ -155,12 +167,14 @@ class MultiAgentF110(MultiAgentEnv, ABC):
             agent_obs = {}
             for key, value in obs.items():
                 if key == 'ego_idx':
-                    agent_obs[key] = np.array(value, dtype=np.int32)
+                    # ego_idx is a Discrete space - pass through as-is (typically int64)
+                    agent_obs[key] = value
                 elif hasattr(value, 'shape') and len(value.shape) > 0 and value.shape[0] == self.env.num_agents:
-                    original_space = self.env.observation_space.spaces[key]
-                    agent_obs[key] = np.clip(value[i].astype(original_space.dtype), original_space.low.min(), original_space.high.max())
+                    # Multi-agent observation - extract for this agent and ensure correct dtype
+                    agent_obs[key] = np.asarray(value[i], dtype=np.float32)
                 else:
-                    agent_obs[key] = np.array(value, dtype=value.dtype if hasattr(value, 'dtype') else np.float32)
+                    # Non-indexed values - ensure correct dtype
+                    agent_obs[key] = np.asarray(value, dtype=np.float32)
             obs_dict[agent] = agent_obs
         return obs_dict
 
@@ -189,4 +203,4 @@ class MultiAgentF110(MultiAgentEnv, ABC):
                 self.env.poses_x[i], self.env.poses_y[i]
             )
             current_progress.append(current_s)
-        return np.array([p / self.env.track.centerline.spline.s[-1] for p in current_progress])
+        return np.asarray([p / self.env.track.centerline.spline.s[-1] for p in current_progress])

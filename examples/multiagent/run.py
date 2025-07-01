@@ -19,7 +19,6 @@ from ray.rllib.algorithms.algorithm import Algorithm
 from ray.tune.analysis import ExperimentAnalysis
 from ray.tune.stopper import TrialPlateauStopper
 from pathlib import Path
-import logging
 
 suppress_warnings()
 logger = get_logger(__name__)
@@ -116,15 +115,12 @@ def run_training(config):
     algorithm_name = config['training']['algorithm']
     config_algo = get_algorithm_config(config, env_config, policies, policy_mapping_fn)
     
-    # Crear callback para guardar la configuración
+    # Create callback for saving configuration
     save_config_callback = SaveConfigCallback(config)
 
-    # Definir el stopper para la convergencia.
-    # Detendrá el trial si la desviación estándar de la recompensa en los últimos
-    # 20 resultados es muy baja, indicando un estancamiento.
-    # No se detendrá ningún trial antes de las primeras 20 iteraciones.
+    # Define stopper for convergence
     stopper = TrialPlateauStopper(
-        metric="episode_reward_mean",
+        metric="env_runners/episode_return_mean",
         std=0.01,
         num_results=20,
         grace_period=20,
@@ -134,10 +130,9 @@ def run_training(config):
     tune.run(
         algorithm_name,
         config=config_algo.to_dict(),
-        # Pasamos el stopper aquí. Se combinará con timesteps_total.
         stop=stopper,
         checkpoint_config=tune.CheckpointConfig(
-            checkpoint_score_attribute="episode_reward_mean",
+            checkpoint_score_attribute="env_runners/episode_return_mean",
             checkpoint_score_order="max",
             num_to_keep=3,
             checkpoint_at_end=True,
@@ -147,6 +142,7 @@ def run_training(config):
         name=config["name"],
         resume="AUTO+ERRORED",
         callbacks=[save_config_callback],
+        max_failures=5, # Allow up to 3 failures before stopping the trial
     )
 
 
@@ -254,11 +250,11 @@ if __name__ == '__main__':
 
         for experiment in experiments_to_run:
             cfg = setup_experiment_config(experiment, config_dir)
-            logging.info(f"Starting training: {cfg['name']}")
+            logger.info(f"Training: {cfg['name']}")
             run_training(cfg)
 
     elif args.command == 'eval':
         experiment = find_experiment(experiments, args.experiment)
         cfg = setup_experiment_config(experiment, config_dir)
-        logging.info(f"Starting evaluation: {cfg['name']} (trial={args.trial})")
+        logger.info(f"Evaluating: {cfg['name']}" + (f" (trial={args.trial})" if args.trial else ""))
         run_evaluation(cfg, args.trial)

@@ -35,6 +35,14 @@ def get_experiment_path(experiment_name, storage_path="ray_results"):
 
 def suppress_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
+    # Suppress gymnasium dtype casting warnings
+    warnings.filterwarnings("ignore", message=".*Box low's precision lowered by casting to float32.*")
+    warnings.filterwarnings("ignore", message=".*Box high's precision lowered by casting to float32.*")
+    warnings.filterwarnings("ignore", message=".*The obs returned by the.*method was expecting numpy array dtype.*")
+    warnings.filterwarnings("ignore", message=".*is not within the observation space.*")
+    # Suppress gymnasium/gym warnings in general
+    warnings.filterwarnings("ignore", category=UserWarning, module="gymnasium")
+    warnings.filterwarnings("ignore", category=UserWarning, module="gym")
 
 def get_reward_class(config):
     reward_function_name = config['training']['reward_function']
