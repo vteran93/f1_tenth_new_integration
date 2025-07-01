@@ -21,6 +21,9 @@ class BaseReward:
 
 # COPILOT NO TOCAR Esta funciona
 class ProgressRewardEnv(MultiAgentF110):
+    def __init__(self, env_config=None):
+        super().__init__(env_config)
+
     def _get_rewards(self, newly_crashed) -> list:
         """Calculate individual rewards for each agent based on the original F110Env reward function."""
 
@@ -46,11 +49,8 @@ class ProgressRewardEnv(MultiAgentF110):
         else:
             # Calculate track progress using centerline spline (from F110Env)
             current_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
-                self.env.poses_x[i], self.env.poses_y[i]
+                self.env.poses_x[i].item(), self.env.poses_y[i].item()
             )
-            # TODO Argument of type "ndarray[Any, dtype[float64]] | Unknown" cannot be assigned to parameter "x" of type "float" in function "calc_arclength_inaccurate"
-#   Type "ndarray[Any, dtype[float64]] | Unknown" is not assignable to type "float"
-#     "ndarray[Any, dtype[float64]]" is not assignable to "float"
 
             # Calculate progress since last step
             prog = current_s - self._last_s[i]
@@ -73,38 +73,33 @@ class ProgressRewardEnv(MultiAgentF110):
 
 
 class SpeedRewardEnv(MultiAgentF110):
-    def __init__(self, env, timestep=0.1):
-        self.env = env
-        super().__init__(env)
+    def __init__(self, env_config=None, timestep=0.01):
+        super().__init__(env_config)
         # Track last positions for speed calculation
         self.last_positions = {f"agent_{i}": (0.0, 0.0) for i in range(self.env.num_agents)}
         # Environment timestep for speed calculation
-        self.timestep = self.env.config.get("timestep", 0.01)
+        self.timestep = self.env.config.get("timestep", timestep)
 
     def _get_rewards(self, newly_crashed) -> list:
         """Calculate individual rewards for each agent based on the original F110Env reward function."""
 
-        # Initialize last_s tracking if not exists (track progress for each agent)
-        if not hasattr(self, '_last_s'):
-            self._last_s = [0.0] * self.env.num_agents
-
         rewards = []
-        reward = 0.0
         for i in range(self.env.num_agents):
             agent = self.agents[i]
             if agent in self._crashed_agents and agent not in newly_crashed:
                 reward = 0.0
             else:
                 current_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
-                    self.env.poses_x[i], self.env.poses_y[i]
+                    self.env.poses_x[i].item(), self.env.poses_y[i].item()
                 )
 
                 reward = self._compute_reward(agent,
                                               current_s,
-                                              self.env.last_s[i],
+                                              self._last_s[i],
                                               (agent in newly_crashed),
                                               self.env.track.centerline.spline.s[-1]
                                               )
+                self._last_s[i] = current_s
 
             rewards.append(reward)
 
@@ -137,8 +132,8 @@ class SpeedRewardEnv(MultiAgentF110):
         agent_idx = int(agent.split("_")[1])
 
         # Get current position
-        current_x = self.env.poses_x[agent_idx]
-        current_y = self.env.poses_y[agent_idx]
+        current_x = self.env.poses_x[agent_idx].item()
+        current_y = self.env.poses_y[agent_idx].item()
         current_pos = (current_x, current_y)
 
         # Calculate speed from track progress (primary method)
@@ -199,7 +194,7 @@ class SACBasicReward(BaseReward):
             else:
                 # Calculate track progress using centerline spline (from F110Env)
                 current_s, _ = env.env.track.centerline.spline.calc_arclength_inaccurate(
-                    env.env.poses_x[i], env.env.poses_y[i]
+                    env.env.poses_x[i].item(), env.env.poses_y[i].item()
                 )
 
                 # Calculate progress since last step
@@ -258,7 +253,7 @@ class SACGeminiReward(BaseReward):
         else:
             # Calculate track progress using centerline spline
             current_s, _ = env.env.track.centerline.spline.calc_arclength_inaccurate(
-                env.env.poses_x[i], env.env.poses_y[i]
+                env.env.poses_x[i].item(), env.env.poses_y[i].item()
             )
 
             # Calculate progress since last step
@@ -305,7 +300,7 @@ class SpeedReward(BaseReward):
             else:
                 # Progress component
                 current_s, _ = env.env.track.raceline.spline.calc_arclength_inaccurate(
-                    env.env.poses_x[i], env.env.poses_y[i]
+                    env.env.poses_x[i].item(), env.env.poses_y[i].item()
                 )
                 prog = current_s - env._last_s[i]
 
@@ -355,7 +350,7 @@ class SafetyReward(BaseReward):
         else:
             # Progress component (reduced weight)
             current_s, _ = env.env.track.centerline.spline.calc_arclength_inaccurate(
-                env.env.poses_x[i], env.env.poses_y[i]
+                env.env.poses_x[i].item(), env.env.poses_y[i].item()
             )
             prog = current_s - env._last_s[i]
 
@@ -380,39 +375,3 @@ class SafetyReward(BaseReward):
             env._last_s[i] = current_s
 
         return reward
-    """Safety-focused reward encouraging careful driving."""
-
-    def _get_rewards(self, env, newly_crashed):
-        """Reward emphasizing safety with distance to walls."""
-        rewards = []
-        for i in range(env.env.num_agents):
-            agent = env.agents[i]
-
-            if agent in env._crashed_agents and agent not in newly_crashed:
-                reward = 0.0
-            else:
-                # Progress component (reduced weight)
-                current_s, _ = env.env.track.centerline.spline.calc_arclength_inaccurate(
-                    env.env.poses_x[i], env.env.poses_y[i]
-                )
-                prog = current_s - env._last_s[i]
-
-                if prog > 0.9 * env.env.track.centerline.spline.s[-1]:
-                    prog = (env.env.track.centerline.spline.s[-1] - env._last_s[i]) + current_s
-
-                # Safety component (minimum distance to walls)
-                min_scan_distance = np.min(env.env.scans[i])
-                safety_reward = min_scan_distance * 0.5  # Reward staying away from walls
-
-                # Combined reward
-                reward = prog * 0.5 + safety_reward
-
-                # Large collision penalty
-                if agent in newly_crashed:
-                    reward -= 5.0
-
-                env._last_s[i] = current_s
-
-            rewards.append(reward)
-
-        return rewards
