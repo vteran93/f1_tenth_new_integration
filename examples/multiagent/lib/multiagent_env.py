@@ -67,6 +67,11 @@ class MultiAgentF110(MultiAgentEnv, ABC):
         rewards = self._get_rewards(newly_crashed)
         lap_progress = self._calculate_lap_progress()
         info["lap_progress"] = lap_progress
+        
+        # Add custom metrics for RLlib tracking (these will appear in episode_custom_metrics)
+        info["lap_progress_mean"] = float(np.mean(lap_progress))
+        info["lap_progress_max"] = float(np.max(lap_progress))
+        info["lap_progress_min"] = float(np.min(lap_progress))
 
         # Convert observations
         full_obs_dict = self._convert_obs(obs)
@@ -143,7 +148,10 @@ class MultiAgentF110(MultiAgentEnv, ABC):
                 if key == 'scans':
                     # Extract single-agent scan space (create bounds directly as float32)
                     scan_shape = (space.shape[1],)
-                    low_val = np.float32(space.low[0].min())
+                    # Data-driven lower bound based on F110Env noise characteristics:
+                    # With std_dev=0.01, 99.99% of noise-induced negative values fall within -0.032m
+                    # This covers realistic sensor noise while preventing extreme outliers
+                    low_val = np.float32(-0.035)  # Conservative bound with small margin
                     high_val = np.float32(space.high[0].max())
                     single_spaces[key] = gym.spaces.Box(
                         low=low_val, high=high_val, shape=scan_shape, dtype=np.float32
