@@ -1,0 +1,48 @@
+# F1TENTH Gym - Standalone Integration Requirements
+# Updated for benchmark integration and advanced features
+
+# Core Framework
+gymnasium==1.0.0
+numpy==1.26.4
+scipy==1.15.3
+
+# Deep Learning & RL
+torch==2.7.1
+ray==2.47.0
+stable-baselines3==2.6.0
+
+# Data Processing & Analysis
+pandas==2.3.0
+matplotlib==3.10.3
+seaborn==0.13.2
+plotly==6.2.0
+
+# Dashboard & Visualization
+streamlit==1.46.1
+tensorboard==2.19.0
+tensorboardX==2.6.4
+
+# F1TENTH Specific
+trajectory-planning-helpers==0.79
+casadi==3.7.0
+numba==0.60.0
+
+# Computer Vision & Graphics
+opencv-python==4.11.0.86
+pillow==11.2.1
+
+# Utilities
+PyYAML==6.0.2
+tqdm==4.67.1
+shapely==2.1.1
+
+# Development & Testing (optional)
+# pytest>=7.0.0
+# pytest-cov>=4.0.0
+# black>=22.0.0
+# flake8>=4.0.0
+
+# Optional: Additional RL Libraries
+# gymnasium[atari]>=1.0.0
+# gymnasium[classic_control]>=1.0.0
+# wandb>=0.15.0  # For experiment tracking
