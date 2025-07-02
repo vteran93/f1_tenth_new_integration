@@ -11,7 +11,7 @@ from lib.utils import (
     find_experiment
 )
 
-from lib.callbacks import SaveConfig, LapProgress
+from lib.callbacks import SaveConfig, LapProgress, EpisodeDuration, LapTimeProxy, CollisionStats, AverageSpeed
 from ray import tune
 from ray.rllib.algorithms.ppo import PPOConfig
 from ray.rllib.algorithms.sac import SACConfig
@@ -54,11 +54,7 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn):
             enable_rl_module_and_learner=False,
             enable_env_runner_and_connector_v2=False,
         )
-        .callbacks(LapProgress) # Custom callback for lap progress
-        .env_runners(
-            num_env_runners=0,
-            num_envs_per_env_runner=1,
-        )
+        .callbacks(LapProgress) #, EpisodeDuration, LapTimeProxy, CollisionStats, AverageSpeed]) # Custom callbacks for metrics
         .multi_agent(
             policies=policies,
             policy_mapping_fn=policy_mapping_fn,
@@ -67,9 +63,10 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn):
             evaluation_interval=config["training"]["eval_interval"],
             evaluation_num_env_runners=1,
             evaluation_config={"seed": 42},
-        ).env_runners(
-            num_env_runners=14,            # 4 procesos en paralelo
-            num_envs_per_env_runner=14,    # 4 entornos vectorizados por proceso
+        )
+        .env_runners(
+            num_env_runners=8,             # Número de procesos paralelos (<=CPUs)
+            num_envs_per_env_runner=2,     # Entornos vectorizados por proceso  
             gym_env_vectorize_mode="ASYNC"
         )
         .debugging(seed=42)
@@ -120,10 +117,12 @@ def run_training(config):
 
     # Define stopper for convergence
     stopper = TrialPlateauStopper(
-        metric="env_runners/episode_return_mean",
-        std=0.01,
-        num_results=20,
-        grace_period=20,
+        metric="env_runners/episode_return_mean", # Metric to monitor
+        std=15.0,                # Standard deviation threshold change
+        num_results=20,         # Number of results to consider for the standard deviation
+        grace_period=275,       # Minimum iterations before considering stopping, this allow initial exploration variability
+        # grace_period is the number of iterations, we can calculate it based on steps = train_batch_size * iterations
+        # so 275 iterations with a train_batch_size of 4000 is about 1_100_000 steps
         mode="max",
     )
 

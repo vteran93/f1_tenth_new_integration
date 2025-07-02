@@ -6,15 +6,6 @@ import gymnasium as gym
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 from abc import ABC, abstractmethod
 
-# Fix for gymnasium compatibility with RLlib
-import gymnasium.envs.registration
-
-class VectorizeMode(Enum):
-    ASYNC = "async"
-    SYNC = "sync"
-
-gymnasium.envs.registration.VectorizeMode = VectorizeMode
-
 
 class MultiAgentF110(MultiAgentEnv, ABC):
     """Multi-agent wrapper for F110Env."""
@@ -141,10 +132,8 @@ class MultiAgentF110(MultiAgentEnv, ABC):
                 if key == 'scans':
                     # Extract single-agent scan space (create bounds directly as float32)
                     scan_shape = (space.shape[1],)
-                    # Data-driven lower bound based on F110Env noise characteristics:
-                    # With std_dev=0.01, 99.99% of noise-induced negative values fall within -0.032m
-                    # This covers realistic sensor noise while preventing extreme outliers
-                    low_val = np.float32(-0.04)  # Increased margin to handle noise outliers
+                    # Increased margin to handle sensor noise and simulation edge cases
+                    low_val = np.float32(-1.0)  # Conservative margin to handle all noise outliers
                     high_val = np.float32(space.high[0].max())
                     single_spaces[key] = gym.spaces.Box(
                         low=low_val, high=high_val, shape=scan_shape, dtype=np.float32
