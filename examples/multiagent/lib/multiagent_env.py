@@ -65,14 +65,7 @@ class MultiAgentF110(MultiAgentEnv, ABC):
 
         # Calculate rewards and metrics
         rewards = self._get_rewards(newly_crashed)
-        lap_progress = self._calculate_lap_progress()
-        info["lap_progress"] = lap_progress
         
-        # Add custom metrics for RLlib tracking (these will appear in episode_custom_metrics)
-        info["lap_progress_mean"] = float(np.mean(lap_progress))
-        info["lap_progress_max"] = float(np.max(lap_progress))
-        info["lap_progress_min"] = float(np.min(lap_progress))
-
         # Convert observations
         full_obs_dict = self._convert_obs(obs)
         

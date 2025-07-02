@@ -68,27 +68,3 @@ def find_experiment(experiments, experiment_name):
         logger.error(f"Experiment '{experiment_name}' not found. Available: {available}")
         exit(1)
     return experiment
-
-class SaveConfigCallback(Callback):
-    def __init__(self, resolved_config):
-        self.resolved_config = resolved_config
-
-    def setup(self, stop=None, num_samples=None, total_num_samples=None, **info):
-        """Called once at the very beginning of training."""
-        import yaml
-        
-        # Save config to the experiment's storage path
-        experiment_name = self.resolved_config["name"]
-        storage_path = self.resolved_config["storage_path"]
-        experiment_dir = os.path.join(storage_path, experiment_name)
-        
-        # Create experiment directory if it doesn't exist
-        os.makedirs(experiment_dir, exist_ok=True)
-        
-        config_file_path = os.path.join(experiment_dir, f"{experiment_name}_config.yaml")
-        
-        with open(config_file_path, 'w') as f:
-            yaml.dump(self.resolved_config, f, default_flow_style=False, indent=2)
-        
-        logger = get_logger(__name__)
-        logger.info(f"Saved resolved experiment config to: {config_file_path}")

@@ -8,9 +8,10 @@ from lib.utils import (
     get_best_checkpoint,
     get_reward_class,
     setup_experiment_config,
-    find_experiment,
-    SaveConfigCallback,
+    find_experiment
 )
+
+from lib.callbacks import SaveConfig, LapProgress
 from ray import tune
 from ray.rllib.algorithms.ppo import PPOConfig
 from ray.rllib.algorithms.sac import SACConfig
@@ -53,6 +54,7 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn):
             enable_rl_module_and_learner=False,
             enable_env_runner_and_connector_v2=False,
         )
+        .callbacks(LapProgress) # Custom callback for lap progress
         .env_runners(
             num_env_runners=0,
             num_envs_per_env_runner=1,
@@ -79,6 +81,7 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn):
 
 def create_env(config, render_mode=None):
     """Loads environment config and creates an environment instance."""
+    suppress_warnings()  # Suppress warnings in worker processes
     # Since environment is always included in the same config, use embedded env_config
     env_config = config['env'].copy()
     
@@ -114,9 +117,6 @@ def run_training(config):
 
     algorithm_name = config['training']['algorithm']
     config_algo = get_algorithm_config(config, env_config, policies, policy_mapping_fn)
-    
-    # Create callback for saving configuration
-    save_config_callback = SaveConfigCallback(config)
 
     # Define stopper for convergence
     stopper = TrialPlateauStopper(
@@ -141,7 +141,7 @@ def run_training(config):
         storage_path=config["storage_path"],
         name=config["name"],
         resume="AUTO+ERRORED",
-        callbacks=[save_config_callback],
+        callbacks=[SaveConfig(config)],
         max_failures=5, # Allow up to 3 failures before stopping the trial
     )
 
