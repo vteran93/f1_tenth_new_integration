@@ -250,7 +250,12 @@ if __name__ == '__main__':
         for experiment in experiments_to_run:
             cfg = setup_experiment_config(experiment, config_dir)
             logger.info(f"Training: {cfg['name']}")
-            run_training(cfg)
+            try:
+                run_training(cfg)
+            except Exception as e:
+                logger.error(f"Error during training of {cfg['name']}: {e}")
+                continue
+            # This way we can catch errors in training and continue with the next experiment
 
     elif args.command == 'eval':
         experiment = find_experiment(experiments, args.experiment)
