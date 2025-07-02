@@ -144,7 +144,7 @@ class MultiAgentF110(MultiAgentEnv, ABC):
                     # Data-driven lower bound based on F110Env noise characteristics:
                     # With std_dev=0.01, 99.99% of noise-induced negative values fall within -0.032m
                     # This covers realistic sensor noise while preventing extreme outliers
-                    low_val = np.float32(-0.035)  # Conservative bound with small margin
+                    low_val = np.float32(-0.04)  # Increased margin to handle noise outliers
                     high_val = np.float32(space.high[0].max())
                     single_spaces[key] = gym.spaces.Box(
                         low=low_val, high=high_val, shape=scan_shape, dtype=np.float32
@@ -175,7 +175,7 @@ class MultiAgentF110(MultiAgentEnv, ABC):
                     agent_obs[key] = np.asarray(value[i], dtype=np.float32)
                 else:
                     # Non-indexed values - ensure correct dtype
-                    agent_obs[key] = np.asarray(value, dtype=np.float32)
+                    agent_obs[key] = np.float32(value)
             obs_dict[agent] = agent_obs
         return obs_dict
 
