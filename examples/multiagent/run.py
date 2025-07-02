@@ -18,7 +18,7 @@ from ray.rllib.algorithms.sac import SACConfig
 from ray.rllib.policy.policy import PolicySpec
 from ray.rllib.algorithms.algorithm import Algorithm
 from ray.tune.analysis import ExperimentAnalysis
-from ray.tune.stopper import TrialPlateauStopper
+from ray.tune.stopper import TrialPlateauStopper, CombinedStopper, Stopper
 from pathlib import Path
 
 suppress_warnings()
@@ -28,6 +28,21 @@ ALGO_MAP = {
     "PPO": (PPOConfig, "ppo_params"),
     "SAC": (SACConfig, "sac_params"),
 }
+
+
+class TimestepsStopper(Stopper):
+    """Custom stopper that stops training after a certain number of timesteps."""
+    
+    def __init__(self, max_timesteps):
+        self.max_timesteps = max_timesteps
+    
+    def __call__(self, trial_id, result):
+        """Stop trial if timesteps_total exceeds max_timesteps."""
+        return result.get("timesteps_total", 0) >= self.max_timesteps
+    
+    def stop_all(self):
+        """Don't stop all experiments."""
+        return False
 
 
 def get_algorithm_config(config, env_config, policies, policy_mapping_fn):
@@ -115,10 +130,10 @@ def run_training(config):
     algorithm_name = config['training']['algorithm']
     config_algo = get_algorithm_config(config, env_config, policies, policy_mapping_fn)
 
-    # Define stopper for convergence
-    stopper = TrialPlateauStopper(
+    # Define plateau stopper for convergence
+    plateau_stopper = TrialPlateauStopper(
         metric="env_runners/episode_return_mean", # Metric to monitor
-        std=15.0,                # Standard deviation threshold change
+        std=10.0,                # Standard deviation threshold change
         num_results=20,         # Number of results to consider for the standard deviation
         grace_period=275,       # Minimum iterations before considering stopping, this allow initial exploration variability
         # grace_period is the number of iterations, we can calculate it based on steps = train_batch_size * iterations
@@ -126,10 +141,19 @@ def run_training(config):
         mode="max",
     )
 
+    # Define timesteps stopper
+    timesteps_stopper = TimestepsStopper(max_timesteps=config["training"]["timesteps_total"])
+    
+    # Combine both stoppers - trial will stop if ANY of the conditions is met
+    combined_stopper = CombinedStopper(
+        plateau_stopper,
+        timesteps_stopper
+    )
+
     tune.run(
         algorithm_name,
         config=config_algo.to_dict(),
-        stop=stopper,
+        stop=combined_stopper,
         checkpoint_config=tune.CheckpointConfig(
             checkpoint_score_attribute="env_runners/episode_return_mean",
             checkpoint_score_order="max",
