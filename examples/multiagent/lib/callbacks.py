@@ -56,14 +56,14 @@ class LapProgress(RLlibCallback):
                 for i, progress in enumerate(lap_progress):
                     agent_id = f"agent_{i}"
                     custom_metrics[f"lap_progress/{agent_id}"] = float(progress)
-                
-                # Combined metric - mean lap progress across all agents  
+
+                # Combined metric - mean lap progress across all agents
                 custom_metrics["lap_progress"] = float(np.mean(lap_progress))
 
 
 class EpisodeDuration(RLlibCallback):
     """A custom RLlib callback to track episode duration."""
-    
+
     def __init__(self):
         super().__init__()
         self._start_times = {}
@@ -107,7 +107,7 @@ class EpisodeDuration(RLlibCallback):
 
 class LapTimeProxy(RLlibCallback):
     """A custom RLlib callback to measure lap completion time as a proxy for lap time."""
-    
+
     def __init__(self):
         super().__init__()
         self._lap_data = {}
@@ -186,7 +186,8 @@ class LapTimeProxy(RLlibCallback):
 
 class CollisionStats(RLlibCallback):
     """A custom RLlib callback to track collision statistics."""
-    
+    # TODO Needs review to check is working
+
     def __init__(self):
         super().__init__()
         self._collision_data = {}
@@ -236,7 +237,7 @@ class CollisionStats(RLlibCallback):
         if hasattr(f110_env, '_crashed_agents') and hasattr(f110_env, 'agents'):
             import time
             current_time = time.time() - self._collision_data[episode_id]['start_time']
-            
+
             for agent in getattr(f110_env, '_crashed_agents', set()):
                 if agent not in self._collision_data[episode_id]['collision_recorded']:
                     self._collision_data[episode_id]['collision_times'][agent] = current_time
@@ -257,11 +258,11 @@ class CollisionStats(RLlibCallback):
         custom_metrics = getattr(episode, "custom_metrics", None)
         if custom_metrics is not None and episode_id in self._collision_data:
             collision_times = self._collision_data[episode_id]['collision_times']
-            
+
             # Log per-agent collision times
             for agent, collision_time in collision_times.items():
                 custom_metrics[f"collision_time/{agent}"] = float(collision_time)
-            
+
             # Log total number of collisions
             custom_metrics["total_collisions"] = len(collision_times)
             # Clean up
@@ -270,7 +271,8 @@ class CollisionStats(RLlibCallback):
 
 class AverageSpeed(RLlibCallback):
     """A custom RLlib callback to calculate average speed for each agent."""
-    
+    # TODO NECEISTA VALIDAR QUE FUNCIONA LA VELOCIDAD
+
     def __init__(self):
         super().__init__()
         self._speed_data = {}
@@ -318,10 +320,10 @@ class AverageSpeed(RLlibCallback):
         underlying_env = getattr(f110_env, 'env', None)
         if underlying_env and hasattr(underlying_env, 'sim') and hasattr(underlying_env.sim, 'agent_velocities'):
             self._speed_data[episode_id]['step_count'] += 1
-            
+
             # Get velocities from the simulator (linear velocity magnitude)
             velocities = underlying_env.sim.agent_velocities[:, 0]  # vx component
-            
+
             for i, agent in enumerate(getattr(f110_env, 'agents', [])):
                 if agent not in self._speed_data[episode_id]['speed_samples']:
                     self._speed_data[episode_id]['speed_samples'][agent] = []
@@ -342,19 +344,76 @@ class AverageSpeed(RLlibCallback):
         custom_metrics = getattr(episode, "custom_metrics", None)
         if custom_metrics is not None and episode_id in self._speed_data:
             speed_samples = self._speed_data[episode_id]['speed_samples']
-            
+
             # Calculate average speed for each agent
             for agent, speeds in speed_samples.items():
                 if speeds:  # Avoid division by zero
                     avg_speed = np.mean(speeds)
                     custom_metrics[f"avg_speed/{agent}"] = float(avg_speed)
-            
+
             # Calculate overall average speed across all agents
             all_speeds = [speed for speeds in speed_samples.values() for speed in speeds]
             if all_speeds:
                 custom_metrics["avg_speed_all"] = float(np.mean(all_speeds))
             # Clean up
             del self._speed_data[episode_id]
+
+
+CALLBACKS = [EpisodeDuration,
+             LapProgress,
+             LapTimeProxy,
+             CollisionStats,
+             AverageSpeed,
+             ]
+
+
+class MultipleAgentCallbacks(RLlibCallback):
+    """A custom RLlib callback to handle multiple agent environments."""
+
+    def on_episode_start(
+        self,
+        *,
+        episode: Union[EpisodeType, EpisodeV2],
+        worker: Optional["EnvRunner"] = None,
+        base_env: Optional[BaseEnv] = None,
+        policies: Optional[Dict[str, Policy]] = None,
+        env_index: Optional[int] = None,
+        **kwargs,
+    ) -> None:
+        """
+        iterates over all the callbacks and calls their on_episode_start method.
+        """
+        for callback_class in CALLBACKS:
+            callback = callback_class()
+            if hasattr(callback, 'on_episode_start'):
+                callback.on_episode_start(
+                    episode=episode,
+                    worker=worker,
+                    base_env=base_env,
+                    policies=policies,
+                    env_index=env_index,
+                    **kwargs
+                )
+
+    def on_episode_end(self, *,
+                       episode: Union[EpisodeType, EpisodeV2],
+                       worker: Optional["EnvRunner"] = None,
+                       base_env: Optional[BaseEnv] = None,
+                       policies: Optional[Dict[str, Policy]] = None,
+                       env_index: Optional[int] = None,
+                       **kwargs, ):
+        """
+        Iterates over all the callbacks and calls their on_episode_end method."""
+        for callback_class in CALLBACKS:
+            callback = callback_class()
+            if hasattr(callback, 'on_episode_end'):
+                callback.on_episode_end(
+                    episode=episode,
+                    worker=worker,
+                    base_env=base_env,
+                    policies=policies,
+                    env_index=env_index,
+                    **kwargs)
 
 
 class SaveConfig(Callback):
@@ -364,19 +423,19 @@ class SaveConfig(Callback):
     def setup(self, stop=None, num_samples=None, total_num_samples=None, **info):
         """Called once at the very beginning of training."""
         import yaml
-        
+
         # Save config to the experiment's storage path
         experiment_name = self.resolved_config["name"]
         storage_path = self.resolved_config["storage_path"]
         experiment_dir = os.path.join(storage_path, experiment_name)
-        
+
         # Create experiment directory if it doesn't exist
         os.makedirs(experiment_dir, exist_ok=True)
-        
+
         config_file_path = os.path.join(experiment_dir, f"{experiment_name}_config.yaml")
-        
+
         with open(config_file_path, 'w') as f:
             yaml.dump(self.resolved_config, f, default_flow_style=False, indent=2)
-        
+
         logger = get_logger(__name__)
         logger.info(f"Saved resolved experiment config to: {config_file_path}")
