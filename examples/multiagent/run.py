@@ -88,14 +88,9 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn):
             evaluation_config={"seed": 42},
         )
         .env_runners(
-            num_env_runners=8,               # 8 actores de sampling
-            num_envs_per_env_runner=8,       # 8 entornos vectorizados c/u
-            gym_env_vectorize_mode="ASYNC",  # paraleliza internamente cada env
-            num_cpus_per_env_runner=1,       # 1 CPU por runner
-            num_gpus_per_env_runner=0.0,     # desactivar GPU en runners
-            max_requests_in_flight_per_env_runner=2,  # manageable backlog
-        ).training(
-            train_batch_size=4096,        # múltiplo de (8 runner × 8 envs)
+            num_env_runners=8,             # Número de procesos paralelos (<=CPUs)
+            num_envs_per_env_runner=2,     # Entornos vectorizados por proceso
+            gym_env_vectorize_mode="ASYNC"
         )
         .debugging(seed=42)
     )
