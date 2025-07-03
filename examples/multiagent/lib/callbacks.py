@@ -13,6 +13,9 @@ from ray.rllib.policy import Policy
 from ray.rllib.env.env_runner import EnvRunner
 from ray.rllib.utils.typing import EpisodeType
 
+# Debug logger specifically for callbacks
+callback_logger = get_logger(__name__ + ".callbacks")
+
 
 class LapProgress(RLlibCallback):
     """A custom RLlib callback to calculate and log lap progress metrics."""
@@ -66,7 +69,7 @@ class EpisodeDuration(RLlibCallback):
 
     def __init__(self):
         super().__init__()
-        self._start_times = {}
+        callback_logger.debug("EpisodeDuration callback initialized")
 
     def on_episode_start(
         self,
@@ -81,7 +84,8 @@ class EpisodeDuration(RLlibCallback):
         """Store the episode start time."""
         import time
         episode_id = getattr(episode, 'episode_id', id(episode))
-        self._start_times[episode_id] = time.time()
+        user_data = getattr(episode, 'user_data')
+        user_data[str(episode_id)] = {'start_time': time.time()}
 
     def on_episode_end(
         self,
@@ -96,13 +100,18 @@ class EpisodeDuration(RLlibCallback):
         """Calculate and log episode duration."""
         import time
         episode_id = getattr(episode, 'episode_id', id(episode))
-        if episode_id in self._start_times:
-            episode_duration = time.time() - self._start_times[episode_id]
+        my_user_data = getattr(episode, 'user_data', {})
+
+        if str(episode_id) in my_user_data:
+            episode_duration = time.time() - my_user_data[str(episode_id)]['start_time']
             custom_metrics = getattr(episode, "custom_metrics", None)
             if custom_metrics is not None:
                 custom_metrics["episode_duration"] = float(episode_duration)
-            # Clean up
-            del self._start_times[episode_id]
+                callback_logger.info(f"Episode {episode_id} duration: {episode_duration:.2f}s")
+            else:
+                callback_logger.warning(f"Episode {episode_id} has no custom_metrics attribute")
+        else:
+            callback_logger.warning(f"Episode {episode_id} start time not found in user_data")
 
 
 class LapTimeProxy(RLlibCallback):
@@ -360,15 +369,32 @@ class AverageSpeed(RLlibCallback):
 
 
 CALLBACKS = [EpisodeDuration,
-             LapProgress,
-             LapTimeProxy,
-             CollisionStats,
-             AverageSpeed,
+             # LapProgress,
+             # LapTimeProxy,
+             # CollisionStats,
+             # AverageSpeed,
              ]
 
 
 class MultipleAgentCallbacks(RLlibCallback):
     """A custom RLlib callback to handle multiple agent environments."""
+
+    def __init__(self):
+        super().__init__()
+        self._callback_instances = {}
+        callback_logger.debug("MultipleAgentCallbacks initialized")
+
+    def _get_callback_instance(self, callback_class, episode_id):
+        """Get or create callback instance for this episode."""
+        if episode_id not in self._callback_instances:
+            self._callback_instances[episode_id] = {}
+
+        callback_name = callback_class.__name__
+        if callback_name not in self._callback_instances[episode_id]:
+            self._callback_instances[episode_id][callback_name] = callback_class()
+            callback_logger.debug(f"Created {callback_name} instance for episode {episode_id}")
+
+        return self._callback_instances[episode_id][callback_name]
 
     def on_episode_start(
         self,
@@ -383,17 +409,23 @@ class MultipleAgentCallbacks(RLlibCallback):
         """
         iterates over all the callbacks and calls their on_episode_start method.
         """
+        episode_id = getattr(episode, 'episode_id', id(episode))
+        callback_logger.debug(f"MultipleAgentCallbacks.on_episode_start called for episode {episode_id}")
         for callback_class in CALLBACKS:
-            callback = callback_class()
-            if hasattr(callback, 'on_episode_start'):
-                callback.on_episode_start(
-                    episode=episode,
-                    worker=worker,
-                    base_env=base_env,
-                    policies=policies,
-                    env_index=env_index,
-                    **kwargs
-                )
+            try:
+                callback = self._get_callback_instance(callback_class, episode_id)
+                if hasattr(callback, 'on_episode_start'):
+                    callback_logger.debug(f"Calling on_episode_start for {callback_class.__name__}")
+                    callback.on_episode_start(
+                        episode=episode,
+                        worker=worker,
+                        base_env=base_env,
+                        policies=policies,
+                        env_index=env_index,
+                        **kwargs
+                    )
+            except Exception as e:
+                callback_logger.error(f"Error in {callback_class.__name__}.on_episode_start: {e}")
 
     def on_episode_end(self, *,
                        episode: Union[EpisodeType, EpisodeV2],
@@ -404,16 +436,28 @@ class MultipleAgentCallbacks(RLlibCallback):
                        **kwargs, ):
         """
         Iterates over all the callbacks and calls their on_episode_end method."""
+        episode_id = getattr(episode, 'episode_id', id(episode))
+        callback_logger.debug(f"MultipleAgentCallbacks.on_episode_end called for episode {episode_id}")
+
         for callback_class in CALLBACKS:
-            callback = callback_class()
-            if hasattr(callback, 'on_episode_end'):
-                callback.on_episode_end(
-                    episode=episode,
-                    worker=worker,
-                    base_env=base_env,
-                    policies=policies,
-                    env_index=env_index,
-                    **kwargs)
+            try:
+                callback = self._get_callback_instance(callback_class, episode_id)
+                if hasattr(callback, 'on_episode_end'):
+                    callback_logger.debug(f"Calling on_episode_end for {callback_class.__name__}")
+                    callback.on_episode_end(
+                        episode=episode,
+                        worker=worker,
+                        base_env=base_env,
+                        policies=policies,
+                        env_index=env_index,
+                        **kwargs)
+            except Exception as e:
+                callback_logger.error(f"Error in {callback_class.__name__}.on_episode_end: {e}")
+
+        # Clean up callback instances for this episode
+        if episode_id in self._callback_instances:
+            del self._callback_instances[episode_id]
+            callback_logger.debug(f"Cleaned up callback instances for episode {episode_id}")
 
 
 class SaveConfig(Callback):
