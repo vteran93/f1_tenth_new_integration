@@ -1,4 +1,3 @@
-import yaml
 import os
 import logging
 
@@ -120,7 +119,6 @@ class LapTimeProxy(RLlibCallback):
 
     def __init__(self):
         super().__init__()
-        self._lap_data = {}
 
     def on_episode_start(
         self,
@@ -155,7 +153,7 @@ class LapTimeProxy(RLlibCallback):
     ) -> None:
         import time
         """Check for lap completion during episode."""
-        callback_logger.info(f"Verifiying Episode on_episode_step called")
+        callback_logger.info("Verifiying Episode on_episode_step called")
         if base_env is None or env_index is None:
             return
 
@@ -257,7 +255,6 @@ class CollisionStats(RLlibCallback):
 
     def __init__(self):
         super().__init__()
-        self._collision_data = {}
 
     def on_episode_start(
         self,
@@ -271,12 +268,14 @@ class CollisionStats(RLlibCallback):
     ) -> None:
         """Initialize collision tracking."""
         import time
-        episode_id = getattr(episode, 'episode_id', id(episode))
-        self._collision_data[episode_id] = {
+        episode_id = str(getattr(episode, 'episode_id', id(episode)))
+        user_data = getattr(episode, 'user_data', {})
+
+        user_data[episode_id] = {"collisions": {
             'start_time': time.time(),
             'collision_times': {},
             'collision_recorded': set()
-        }
+        }}
 
     def on_episode_step(
         self,
@@ -292,23 +291,23 @@ class CollisionStats(RLlibCallback):
         if base_env is None or env_index is None:
             return
 
-        episode_id = getattr(episode, 'episode_id', id(episode))
-        if episode_id not in self._collision_data:
+        episode_id = str(getattr(episode, 'episode_id', id(episode)))
+        user_data = getattr(episode, 'user_data')
+
+        if episode_id not in user_data:
             return
 
         # Get the sub-environment and unwrap to F110Env
-        sub_env = base_env.get_sub_environments()[env_index]
-        f110_env = getattr(sub_env, 'env', sub_env)
-
+        multiagent_env = base_env.get_sub_environments()[env_index]
         # Use the multiagent wrapper's collision tracking
-        if hasattr(f110_env, '_crashed_agents') and hasattr(f110_env, 'agents'):
+        if hasattr(multiagent_env, '_crashed_agents') and hasattr(multiagent_env, 'agents'):
             import time
-            current_time = time.time() - self._collision_data[episode_id]['start_time']
+            current_time = time.time() - user_data[episode_id]["collisions"]['start_time']
 
-            for agent in getattr(f110_env, '_crashed_agents', set()):
-                if agent not in self._collision_data[episode_id]['collision_recorded']:
-                    self._collision_data[episode_id]['collision_times'][agent] = current_time
-                    self._collision_data[episode_id]['collision_recorded'].add(agent)
+            for agent in getattr(multiagent_env, '_crashed_agents', set()):
+                if agent not in user_data[episode_id]["collisions"]['collision_recorded']:
+                    user_data[episode_id]["collisions"]['collision_times'][agent] = current_time
+                    user_data[episode_id]["collisions"]['collision_recorded'].add(agent)
 
     def on_episode_end(
         self,
@@ -321,10 +320,11 @@ class CollisionStats(RLlibCallback):
         **kwargs,
     ) -> None:
         """Log collision statistics."""
-        episode_id = getattr(episode, 'episode_id', id(episode))
-        custom_metrics = getattr(episode, "custom_metrics", None)
-        if custom_metrics is not None and episode_id in self._collision_data:
-            collision_times = self._collision_data[episode_id]['collision_times']
+        episode_id = str(getattr(episode, 'episode_id', id(episode)))
+        custom_metrics = getattr(episode, "custom_metrics", {})
+        user_data = getattr(episode, 'user_data')
+        if custom_metrics is not None and episode_id in user_data:
+            collision_times = user_data[episode_id]["collisions"]['collision_times']
 
             # Log per-agent collision times
             for agent, collision_time in collision_times.items():
@@ -333,7 +333,7 @@ class CollisionStats(RLlibCallback):
             # Log total number of collisions
             custom_metrics["total_collisions"] = len(collision_times)
             # Clean up
-            del self._collision_data[episode_id]
+            del user_data[episode_id]["collisions"]
 
 
 class AverageSpeed(RLlibCallback):
@@ -429,8 +429,8 @@ class AverageSpeed(RLlibCallback):
 CALLBACKS = [
     # EpisodeDuration, # Fixed
     # LapProgress, # Ok
-    LapTimeProxy,
-    # CollisionStats,
+    # LapTimeProxy,# ok
+    CollisionStats,
     # AverageSpeed,
 ]
 
