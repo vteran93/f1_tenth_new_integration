@@ -10,7 +10,6 @@ from lib.utils import (
     setup_experiment_config,
     find_experiment
 )
-
 from lib.callbacks import SaveConfig, MultipleAgentCallbacks
 from ray import tune
 from ray.rllib.algorithms.ppo import PPOConfig
@@ -64,19 +63,11 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn):
     algo_config = (
         AlgoConfigClass()
         .environment(get_reward_class(config), env_config=env_config, **env_kwargs)
-        .framework("torch", torch_compile_worker=True)
+        .framework("torch")
         .api_stack(
             enable_rl_module_and_learner=False,
             enable_env_runner_and_connector_v2=False,
         )
-        .resources(
-            num_cpus_for_local_worker=1,    # worker principal
-            num_gpus=0,                     # sin GPU
-            num_learner_workers=2,         # divide el entrenamiento en 2 learners
-            num_cpus_per_learner_worker=3,  # 3 CPUs por learner
-        )
-        # , EpisodeDuration, LapTimeProxy, CollisionStats, AverageSpeed]) # Custom callbacks for metrics
-        # EpisodeDuration, LapTimeProxy, CollisionStats, AverageSpeed
         .callbacks(MultipleAgentCallbacks)
         .multi_agent(
             policies=policies,
