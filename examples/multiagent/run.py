@@ -135,7 +135,7 @@ def run_training(config):
         metric="env_runners/episode_return_mean", # Metric to monitor
         std=10.0,                # Standard deviation threshold change
         num_results=20,         # Number of results to consider for the standard deviation
-        grace_period=275,       # Minimum iterations before considering stopping, this allow initial exploration variability
+        # grace_period=275,       # Minimum iterations before considering stopping, this allow initial exploration variability
         # grace_period is the number of iterations, we can calculate it based on steps = train_batch_size * iterations
         # so 275 iterations with a train_batch_size of 4000 is about 1_100_000 steps
         mode="max",
