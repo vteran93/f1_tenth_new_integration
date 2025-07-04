@@ -1,13 +1,14 @@
 import yaml
 import os
 import logging
+
 from ray.rllib.callbacks.callbacks import RLlibCallback
 from ray.rllib.env.base_env import BaseEnv
 import numpy as np
 from examples.multiagent.lib.utils import get_logger
-from f1tenth_gym.envs import F110Env
+from f1tenth_gym.envs.f110_env import F110Env
 from ray.tune.callback import Callback
-from typing import Dict, Optional, Union
+from typing import Dict, Optional, Union, Any
 from ray.rllib.evaluation.episode_v2 import EpisodeV2
 from ray.rllib.policy import Policy
 from ray.rllib.env.env_runner import EnvRunner
@@ -133,12 +134,14 @@ class LapTimeProxy(RLlibCallback):
     ) -> None:
         """Initialize lap tracking data."""
         import time
-        episode_id = getattr(episode, 'episode_id', id(episode))
-        self._lap_data[episode_id] = {
+        episode_id = str(getattr(episode, 'episode_id', id(episode)))
+        user_data = getattr(episode, 'user_data')
+        user_data[episode_id] = {
             'lap_start_time': time.time(),
             'lap_completed': False,
             'lap_time': 0.0
         }
+        callback_logger.info(f"Episode on_episode_start {episode_id} is registered for lap time tracking")
 
     def on_episode_step(
         self,
@@ -150,30 +153,46 @@ class LapTimeProxy(RLlibCallback):
         env_index: Optional[int] = None,
         **kwargs,
     ) -> None:
+        import time
         """Check for lap completion during episode."""
+        callback_logger.info(f"Verifiying Episode on_episode_step called")
         if base_env is None or env_index is None:
             return
 
-        episode_id = getattr(episode, 'episode_id', id(episode))
-        if episode_id not in self._lap_data:
+        episode_id = str(getattr(episode, 'episode_id', id(episode)))
+        user_data = getattr(episode, 'user_data')
+        custom_metrics = getattr(episode, "custom_metrics", {})
+
+        callback_logger.info(f"Verifiying Episode on_episode_step {episode_id} for lap time tracking")
+
+        if episode_id not in user_data:
             return
+        callback_logger.info(f"Episode on_episode_step {episode_id} is registered for lap time tracking")
 
         # Get the sub-environment and unwrap to F110Env
         sub_env = base_env.get_sub_environments()[env_index]
-        f110_env = getattr(sub_env, 'env', sub_env)
+        f110_env: Any = getattr(sub_env, 'env', sub_env)
 
         # Check if any agent completed a lap using the underlying F110Env
-        underlying_env = getattr(f110_env, 'env', None)
-        if underlying_env and hasattr(underlying_env, 'toggle_list'):
-            if not self._lap_data[episode_id]['lap_completed']:
+        if f110_env and hasattr(f110_env, 'toggle_list'):
+            callback_logger.info(f"Episode on_episode_step {episode_id} f110_env toggle_list found")
+            if not user_data[episode_id]['lap_completed']:
                 # Check if any agent has completed a lap (toggle_list >= 4 indicates lap completion)
-                if np.any(underlying_env.toggle_list >= 4):
-                    import time
-                    lap_time = time.time() - self._lap_data[episode_id]['lap_start_time']
-                    self._lap_data[episode_id]['lap_time'] = lap_time
-                    self._lap_data[episode_id]['lap_completed'] = True
+                if np.any(getattr(f110_env, 'toggle_list') >= 4):
+                    lap_time = time.time() - user_data[episode_id]['lap_start_time']
+                    callback_logger.info(f"Episode {episode_id} lap_time: {lap_time:.2f}s")
+                    user_data[episode_id]['lap_time'] = lap_time
+                    user_data[episode_id]['lap_completed'] = True
+                    custom_metrics["complete_lap_time"] = lap_time
+                else:
+                    incomplete_lap_time = time.time() - user_data[episode_id]['lap_start_time']
+                    callback_logger.info(f"Episode {episode_id} incomplete_lap_time: {incomplete_lap_time:.2f}s")
+                    user_data[episode_id]['incomplete_lap_time'] = incomplete_lap_time
+                    user_data[episode_id]['lap_completed'] = False
+                    custom_metrics["incomplete_lap_time"] = incomplete_lap_time
 
     def on_episode_end(
+
         self,
         *,
         episode: Union[EpisodeType, EpisodeV2],
@@ -183,14 +202,53 @@ class LapTimeProxy(RLlibCallback):
         env_index: Optional[int] = None,
         **kwargs,
     ) -> None:
-        """Log lap time if a lap was completed."""
-        episode_id = getattr(episode, 'episode_id', id(episode))
+        """Called at the end of each episode to log lap time metrics and clean up episode data.
+
+        This callback method processes completed episodes by:
+        - Extracting lap time information from episode user data
+        - Logging lap completion status and duration
+        - Adding lap time metrics to custom metrics for tracking
+        - Cleaning up episode-specific data from user_data storage
+
+        For completed laps, it records the 'lap_time_proxy' metric.
+        For incomplete laps, it records the 'incomplete_lap_time_proxy' metric.
+
+        Args:
+            episode: The episode object containing episode data and metrics
+            worker: Optional environment runner instance
+            base_env: Optional base environment instance
+            policies: Optional dictionary mapping policy IDs to policy objects
+            env_index: Optional environment index for multi-environment setups
+            **kwargs: Additional keyword arguments
+
+        Returns:
+            None
+
+        Note:
+            This method assumes episode user_data contains lap tracking information
+            with keys 'lap_completed', 'lap_time', and 'incomplete_lap_time'.
+        """
+        episode_id = str(getattr(episode, 'episode_id', id(episode)))
         custom_metrics = getattr(episode, "custom_metrics", None)
-        if custom_metrics is not None and episode_id in self._lap_data:
-            if self._lap_data[episode_id]['lap_completed']:
-                custom_metrics["lap_time_proxy"] = float(self._lap_data[episode_id]['lap_time'])
+        user_data = getattr(episode, 'user_data')
+        callback_logger.info(f"Clening Episode {episode_id} on on_episode_end")
+
+        if custom_metrics is not None and episode_id in user_data:
+            callback_logger.info(f"Clening Episode valid custom_metrics {episode_id} on on_episode_end")
+
+            if user_data[episode_id]['lap_completed']:
+                callback_logger.info(f"We got custom metrics for {episode_id} with lap_completed on on_episode_end")
+                lap_time_proxy = float(user_data[episode_id]['lap_time'])
+                callback_logger.info(f"Episode {episode_id} duration: {lap_time_proxy:.2f}s")
+                custom_metrics["lap_time_proxy"] = lap_time_proxy
+            else:
+                incomplete_lap_time = user_data[episode_id]['incomplete_lap_time']
+                callback_logger.info(
+                    f"Episode {episode_id} on_episode_end incomplete_lap_time: {incomplete_lap_time:.2f}s")
+                custom_metrics["incomplete_lap_time_proxy"] = incomplete_lap_time
+
             # Clean up
-            del self._lap_data[episode_id]
+            del user_data[episode_id]
 
 
 class CollisionStats(RLlibCallback):
@@ -368,12 +426,13 @@ class AverageSpeed(RLlibCallback):
             del self._speed_data[episode_id]
 
 
-CALLBACKS = [EpisodeDuration,
-             # LapProgress,
-             # LapTimeProxy,
-             # CollisionStats,
-             # AverageSpeed,
-             ]
+CALLBACKS = [
+    # EpisodeDuration, # Fixed
+    # LapProgress, # Ok
+    LapTimeProxy,
+    # CollisionStats,
+    # AverageSpeed,
+]
 
 
 class MultipleAgentCallbacks(RLlibCallback):
@@ -426,6 +485,38 @@ class MultipleAgentCallbacks(RLlibCallback):
                     )
             except Exception as e:
                 callback_logger.error(f"Error in {callback_class.__name__}.on_episode_start: {e}")
+
+    def on_episode_step(
+        self,
+        *,
+        episode: Union[EpisodeType, EpisodeV2],
+        worker: Optional["EnvRunner"] = None,
+        base_env: Optional[BaseEnv] = None,
+        policies: Optional[Dict[str, Policy]] = None,
+        env_index: Optional[int] = None,
+        **kwargs,
+    ) -> None:
+        """
+        Iterates over all the callbacks and calls their on_episode_step method.
+        """
+        episode_id = getattr(episode, 'episode_id', id(episode))
+        callback_logger.debug(f"MultipleAgentCallbacks.on_episode_step called for episode {episode_id}")
+
+        for callback_class in CALLBACKS:
+            try:
+                callback = self._get_callback_instance(callback_class, episode_id)
+                if hasattr(callback, 'on_episode_step'):
+                    callback_logger.debug(f"Calling on_episode_step for {callback_class.__name__}")
+                    callback.on_episode_step(
+                        episode=episode,
+                        worker=worker,
+                        base_env=base_env,
+                        policies=policies,
+                        env_index=env_index,
+                        **kwargs
+                    )
+            except Exception as e:
+                callback_logger.error(f"Error in {callback_class.__name__}.on_episode_step: {e}")
 
     def on_episode_end(self, *,
                        episode: Union[EpisodeType, EpisodeV2],
