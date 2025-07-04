@@ -338,11 +338,10 @@ class CollisionStats(RLlibCallback):
 
 class AverageSpeed(RLlibCallback):
     """A custom RLlib callback to calculate average speed for each agent."""
-    # TODO NECEISTA VALIDAR QUE FUNCIONA LA VELOCIDAD
 
     def __init__(self):
         super().__init__()
-        self._speed_data = {}
+        callback_logger.debug("AverageSpeed callback initialized")
 
     def on_episode_start(
         self,
@@ -354,12 +353,14 @@ class AverageSpeed(RLlibCallback):
         env_index: Optional[int] = None,
         **kwargs,
     ) -> None:
-        """Initialize speed tracking."""
-        episode_id = getattr(episode, 'episode_id', id(episode))
-        self._speed_data[episode_id] = {
+        """Initialize speed tracking for this episode."""
+        episode_id = str(getattr(episode, 'episode_id', id(episode)))
+        user_data = getattr(episode, 'user_data')
+        user_data[episode_id] = {
             'speed_samples': {},
             'step_count': 0
         }
+        callback_logger.debug(f"Episode {episode_id} speed tracking initialized")
 
     def on_episode_step(
         self,
@@ -375,26 +376,30 @@ class AverageSpeed(RLlibCallback):
         if base_env is None or env_index is None:
             return
 
-        episode_id = getattr(episode, 'episode_id', id(episode))
-        if episode_id not in self._speed_data:
+        episode_id = str(getattr(episode, 'episode_id', id(episode)))
+        user_data = getattr(episode, 'user_data')
+
+        if episode_id not in user_data:
             return
 
         # Get the sub-environment and unwrap to F110Env
         sub_env = base_env.get_sub_environments()[env_index]
         f110_env = getattr(sub_env, 'env', sub_env)
 
-        # Use F110Env's velocity data from the underlying simulator
-        underlying_env = getattr(f110_env, 'env', None)
-        if underlying_env and hasattr(underlying_env, 'sim') and hasattr(underlying_env.sim, 'agent_velocities'):
-            self._speed_data[episode_id]['step_count'] += 1
+        # Get velocities from agent states correctly
+        if hasattr(f110_env, 'sim') and hasattr(f110_env.sim, 'agents'):
+            for i in range(f110_env.num_agents):
+                agent_id = f"agent_{i}"
+                if agent_id not in user_data[episode_id]['speed_samples']:
+                    user_data[episode_id]['speed_samples'][agent_id] = []
 
-            # Get velocities from the simulator (linear velocity magnitude)
-            velocities = underlying_env.sim.agent_velocities[:, 0]  # vx component
+                # Get velocity from agent state: [x, y, steer_angle, vel, yaw_angle, yaw_rate, slip_angle]
+                # Index 3 is the longitudinal velocity
+                velocity = f110_env.sim.agents[i].state[3]
+                speed = abs(velocity)  # Use absolute value for speed
+                user_data[episode_id]['speed_samples'][agent_id].append(speed)
 
-            for i, agent in enumerate(getattr(f110_env, 'agents', [])):
-                if agent not in self._speed_data[episode_id]['speed_samples']:
-                    self._speed_data[episode_id]['speed_samples'][agent] = []
-                self._speed_data[episode_id]['speed_samples'][agent].append(float(np.abs(velocities[i])))
+            user_data[episode_id]['step_count'] += 1
 
     def on_episode_end(
         self,
@@ -407,31 +412,45 @@ class AverageSpeed(RLlibCallback):
         **kwargs,
     ) -> None:
         """Calculate and log average speeds."""
-        episode_id = getattr(episode, 'episode_id', id(episode))
+        episode_id = str(getattr(episode, 'episode_id', id(episode)))
+        user_data = getattr(episode, 'user_data')
         custom_metrics = getattr(episode, "custom_metrics", None)
-        if custom_metrics is not None and episode_id in self._speed_data:
-            speed_samples = self._speed_data[episode_id]['speed_samples']
 
-            # Calculate average speed for each agent
-            for agent, speeds in speed_samples.items():
-                if speeds:  # Avoid division by zero
+        if custom_metrics is not None and episode_id in user_data:
+            speed_samples = user_data[episode_id]['speed_samples']
+
+            # Calculate per-agent average speeds
+            for agent_id, speeds in speed_samples.items():
+                if speeds:
                     avg_speed = np.mean(speeds)
-                    custom_metrics[f"avg_speed/{agent}"] = float(avg_speed)
+                    max_speed = np.max(speeds)
+                    min_speed = np.min(speeds)
+                    custom_metrics[f"avg_speed/{agent_id}"] = float(avg_speed)
+                    custom_metrics[f"max_speed/{agent_id}"] = float(max_speed)
+                    custom_metrics[f"min_speed/{agent_id}"] = float(min_speed)
+
+                    callback_logger.info(
+                        f"Episode {episode_id} {agent_id}: avg_speed={avg_speed:.2f}, max_speed={max_speed:.2f}")
 
             # Calculate overall average speed across all agents
             all_speeds = [speed for speeds in speed_samples.values() for speed in speeds]
             if all_speeds:
-                custom_metrics["avg_speed_all"] = float(np.mean(all_speeds))
+                custom_metrics["avg_speed"] = float(np.mean(all_speeds))
+                custom_metrics["max_speed"] = float(np.max(all_speeds))
+                custom_metrics["min_speed"] = float(np.min(all_speeds))
+
+                callback_logger.info(f"Episode {episode_id} overall: avg_speed={custom_metrics['avg_speed']:.2f}")
+
             # Clean up
-            del self._speed_data[episode_id]
+            del user_data[episode_id]
 
 
 CALLBACKS = [
     # EpisodeDuration, # Fixed
     # LapProgress, # Ok
     # LapTimeProxy,# ok
-    CollisionStats,
-    # AverageSpeed,
+    # CollisionStats, #ok
+    AverageSpeed,
 ]
 
 
