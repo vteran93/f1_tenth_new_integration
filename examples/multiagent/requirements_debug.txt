@@ -1,0 +1,29 @@
+# Librerías core para entrenamiento SAC
+ray==2.47.1
+torch==2.7.1
+gymnasium==1.0.0
+
+# Librerías de soporte
+numpy==1.26.4
+pandas==2.3.0
+matplotlib==3.10.3
+
+# Librerías adicionales de Ray/ML
+grpcio==1.73.1
+protobuf==6.31.1
+pyarrow==20.0.0
+tensorboard==2.19.0
+tqdm==4.67.1
+
+# Dependencias de PyTorch GPU (opcionales)
+nvidia-cublas-cu12==12.6.4.1
+nvidia-cuda-cupti-cu12==12.6.80
+nvidia-cuda-nvrtc-cu12==12.6.77
+nvidia-cuda-runtime-cu12==12.6.77
+nvidia-cudnn-cu12==9.5.1.17
+triton==3.3.1
+
+# Utilidades
+cloudpickle==3.1.1
+packaging==25.0
+PyYAML==6.0.2

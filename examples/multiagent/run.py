@@ -10,8 +10,7 @@ from lib.utils import (
     setup_experiment_config,
     find_experiment
 )
-
-from lib.callbacks import SaveConfig, LapProgress, EpisodeDuration, LapTimeProxy, CollisionStats, AverageSpeed
+from lib.callbacks import SaveConfig, MultipleAgentCallbacks
 from ray import tune
 from ray.rllib.algorithms.ppo import PPOConfig
 from ray.rllib.algorithms.sac import SACConfig
@@ -32,14 +31,14 @@ ALGO_MAP = {
 
 class TimestepsStopper(Stopper):
     """Custom stopper that stops training after a certain number of timesteps."""
-    
+
     def __init__(self, max_timesteps):
         self.max_timesteps = max_timesteps
-    
+
     def __call__(self, trial_id, result):
         """Stop trial if timesteps_total exceeds max_timesteps."""
         return result.get("timesteps_total", 0) >= self.max_timesteps
-    
+
     def stop_all(self):
         """Don't stop all experiments."""
         return False
@@ -55,12 +54,12 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn):
 
     # Get algorithm config from the merged config instead of loading separate file
     algo_config_file = config.get(config_key, {}).copy()  # Make a copy to avoid mutations
-    env_kwargs = algo_config_file.get('environment', {}) 
-    
+    env_kwargs = algo_config_file.get('environment', {})
+
     # Clean up the config before passing to training
     if 'environment' in algo_config_file:
         del algo_config_file['environment']
-        
+
     algo_config = (
         AlgoConfigClass()
         .environment(get_reward_class(config), env_config=env_config, **env_kwargs)
@@ -69,7 +68,7 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn):
             enable_rl_module_and_learner=False,
             enable_env_runner_and_connector_v2=False,
         )
-        .callbacks(LapProgress) #, EpisodeDuration, LapTimeProxy, CollisionStats, AverageSpeed]) # Custom callbacks for metrics
+        .callbacks(MultipleAgentCallbacks)
         .multi_agent(
             policies=policies,
             policy_mapping_fn=policy_mapping_fn,
@@ -81,7 +80,7 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn):
         )
         .env_runners(
             num_env_runners=8,             # Número de procesos paralelos (<=CPUs)
-            num_envs_per_env_runner=2,     # Entornos vectorizados por proceso  
+            num_envs_per_env_runner=2,     # Entornos vectorizados por proceso
             gym_env_vectorize_mode="ASYNC"
         )
         .debugging(seed=42)
@@ -96,7 +95,7 @@ def create_env(config, render_mode=None):
     suppress_warnings()  # Suppress warnings in worker processes
     # Since environment is always included in the same config, use embedded env_config
     env_config = config['env'].copy()
-    
+
     if render_mode:
         env_config["render_mode"] = render_mode
 
@@ -106,10 +105,10 @@ def create_env(config, render_mode=None):
 
 def run_training(config):
     temp_env, env_config = create_env(config)
-    
+
     # Check if we should use shared policy or individual policies per agent
     shared_policy = config['training'].get('shared_policy', True)  # Default to shared policy
-    
+
     if shared_policy:
         logger.info("Using shared policy")
         shared_policy_name = "shared_policy"
@@ -120,11 +119,11 @@ def run_training(config):
     else:
         logger.info("Using individual policies")
         policies = {
-            agent: PolicySpec(None, temp_env.observation_space, temp_env.action_space, {}) 
+            agent: PolicySpec(None, temp_env.observation_space, temp_env.action_space, {})
             for agent in temp_env.agents
         }
         policy_mapping_fn = lambda agent_id, *args, **kwargs: agent_id
-    
+
     temp_env.close()
 
     algorithm_name = config['training']['algorithm']
@@ -132,7 +131,7 @@ def run_training(config):
 
     # Define plateau stopper for convergence
     plateau_stopper = TrialPlateauStopper(
-        metric="env_runners/episode_return_mean", # Metric to monitor
+        metric="env_runners/episode_return_mean",  # Metric to monitor
         std=10.0,                # Standard deviation threshold change
         num_results=20,         # Number of results to consider for the standard deviation
         # grace_period=275,       # Minimum iterations before considering stopping, this allow initial exploration variability
@@ -143,7 +142,7 @@ def run_training(config):
 
     # Define timesteps stopper
     timesteps_stopper = TimestepsStopper(max_timesteps=config["training"]["timesteps_total"])
-    
+
     # Combine both stoppers - trial will stop if ANY of the conditions is met
     combined_stopper = CombinedStopper(
         plateau_stopper,
@@ -165,7 +164,7 @@ def run_training(config):
         name=config["name"],
         resume="AUTO+ERRORED",
         callbacks=[SaveConfig(config)],
-        max_failures=5, # Allow up to 3 failures before stopping the trial
+        max_failures=5,  # Allow up to 3 failures before stopping the trial
     )
 
 
@@ -175,27 +174,27 @@ def run_evaluation(config, trial_name=None):
 
     logger.debug(f"Loading results from: {experiment_path}")
     analysis = ExperimentAnalysis(experiment_path)
-    
+
     if trial_name:
         # Filter trials by trial_name pattern
         filtered_trials = []
         for trial in analysis.trials:
             trial_path = trial.local_dir if hasattr(trial, 'local_dir') else ''
-            if (trial_name in trial.trial_id or 
-                trial_name in trial_path):
+            if (trial_name in trial.trial_id or
+                    trial_name in trial_path):
                 filtered_trials.append(trial)
-        
+
         if not filtered_trials:
             logger.error(f"No trials found matching: {trial_name}")
             available_names = [trial.trial_id for trial in analysis.trials]
             logger.debug(f"Available trials: {available_names}")
             return
-        
+
         analysis.trials = filtered_trials
         logger.info(f"Found {len(filtered_trials)} trial(s) matching '{trial_name}'")
     else:
         logger.debug("Using best trial from experiment")
-    
+
     best_checkpoint = get_best_checkpoint(analysis)
 
     if not best_checkpoint:
@@ -213,7 +212,7 @@ def run_evaluation(config, trial_name=None):
 
     num_episodes = config.get("evaluation", {}).get("episodes", 5)
     logger.info(f"Running {num_episodes} evaluation episodes")
-    
+
     for eval_num in range(1, num_episodes + 1):
         logger.debug(f"Episode {eval_num}/{num_episodes}")
         obs, info = env.reset()
@@ -238,12 +237,13 @@ def run_evaluation(config, trial_name=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog=Path(__file__).stem, description='Run F1TENTH multi-agent training or evaluation.',
-        formatter_class=argparse.RawTextHelpFormatter
-    )
+                                     formatter_class=argparse.RawTextHelpFormatter
+                                     )
     parser.add_argument(
         '--config', type=Path, default=Path('configs/experiments.yaml'), help='Path to the experiments configuration file.')
 
-    subparsers = parser.add_subparsers(title='Commands', dest='command', required=True, help='Choose one of the available commands.')
+    subparsers = parser.add_subparsers(title='Commands', dest='command', required=True,
+                                       help='Choose one of the available commands.')
 
     # Train parser
     train_parser = subparsers.add_parser('train', help='Train one or more experiments.')
@@ -254,7 +254,8 @@ if __name__ == '__main__':
     # Eval parser
     eval_parser = subparsers.add_parser('eval', help='Evaluate a trained model.')
     eval_parser.add_argument('--experiment', type=str, required=True, help='Name of the experiment to run.')
-    eval_parser.add_argument('--trial', type=str, default=None, help='Specific trial to evaluate (uses best if not specified).')
+    eval_parser.add_argument('--trial', type=str, default=None,
+                             help='Specific trial to evaluate (uses best if not specified).')
 
     args = parser.parse_args()
 
