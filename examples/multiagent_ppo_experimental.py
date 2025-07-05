@@ -390,7 +390,7 @@ def setup_training(resume_from=None):
     # If not resuming or resume path not found, create a new directory
     if not model_dir:
         env_config = get_env_config()
-        reset_config = env_config["reset_config"]
+        reset_config = env_config["reset_config"]["type"]
         env_class_name = geminiReward.__name__
         date_str = datetime.now().strftime("%Y%m%d%H%M%S")
         run_name = f"multiagent_ppo_{date_str}_{reset_config}_{env_class_name}"
@@ -415,7 +415,7 @@ def setup_training(resume_from=None):
             print(f"Could not restore model from {model_dir}. Training will start from scratch and overwrite. Error: {e}")
 
     # Training loop
-    TOTAL_TIMESTEPS = 1_000_000
+    TOTAL_TIMESTEPS = 3_000_000
 
     while True:
         result = algo.train()
