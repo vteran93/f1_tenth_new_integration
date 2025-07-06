@@ -75,6 +75,18 @@ experiments:
     sac_params:
       <<: *sac_params
 
+  - name: oval_small_SAC_Individual_Policy
+    storage_path: ../models
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: falseº
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+    sac_params:
+      <<: *sac_params
 
   - name: oval_small_SAC_Kohonda_Shared_Policy
     storage_path: ../models
