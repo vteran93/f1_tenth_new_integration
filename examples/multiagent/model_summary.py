@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+
+# DEPRECATEEEEEEEEEDD
+# PODRIAMOS APROVECHAR ALGUNAS FUNCIONES DE ESTE SCRIPT PARA EL analysis.ipynb ???
+# YA NO EXISTE EL ARCHIVO batch_train_all_rewards.py, SOLO USAMOS run.py
+
+
 """
 Model Summary Script
 
@@ -220,7 +226,7 @@ def main():
 
     print("=" * 80)
 
-    return 0
+    return 0 
 
 
 if __name__ == "__main__":

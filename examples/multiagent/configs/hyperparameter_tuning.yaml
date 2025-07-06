@@ -73,3 +73,16 @@ experiments:
   #     <<: *env
   #   sac_params:
   #     <<: *sac_params
+
+### Possible hyperparameter tuning configuration (not tested)
+# search_space = {
+#     "lr": tune.loguniform(1e-5, 1e-3),
+#     "gamma": tune.uniform(0.95, 0.999),
+#     "lambda_": tune.uniform(0.9, 1.0),
+#     "clip_param": tune.uniform(0.1, 0.4),
+#     "train_batch_size": tune.choice([256, 512, 1024, 2048, 4096]),
+#     "num_sgd_iter": tune.choice([5, 10, 20]),
+#     "sgd_minibatch_size": tune.choice([64, 128, 256]),
+#     "entropy_coeff": tune.uniform(0.0, 0.05),
+#     "model": {"fcnet_hiddens": tune.choice([(128, 128), (256, 256), (256, 128)])} 
+# }
