@@ -517,6 +517,8 @@ class KohondaMultiAgentF110Env(MultiAgentF110):
         self.prev_vels = np.zeros((self.env.num_agents, 2), dtype=np.float32)
         self.prev_steer_angle = np.zeros(self.env.num_agents, dtype=np.float32)
         self.prev_yaw = np.zeros(self.env.num_agents, dtype=np.float32)
+        # Initialize crashed agents set
+        self._crashed_agents = set()
 
         # Override observation space to match our custom vectorized observation
         # The observation has 29 elements: 6 velocities + 1 yaw_dev + 18 depths + 4 additional features
@@ -535,21 +537,19 @@ class KohondaMultiAgentF110Env(MultiAgentF110):
         return pt, int(index)
 
     def _compute_reward(self, agent, newly_crashed, i) -> float:
-        total = 0.0
-        for j in range(self.env.num_agents):
-            dist = np.linalg.norm(
-                self._current_waypoints[j] - self.prev_waypoints[j])
-            pen = 0.0
-            if self.env.collisions[j] > 0:
-                v = self.prev_vels[j]
-                pen = -0.05 * np.dot(v, v)
-            r = dist + pen
-            if not np.isfinite(r):
-                print(
-                    f"[WARN] Agent {j} invalid reward dist={dist}, pen={pen}")
-                r = -1.0
-            total += r
-        return float(total)
+        # Calculate reward only for the specific agent (not sum of all agents)
+        dist = np.linalg.norm(
+            self._current_waypoints[i] - self.prev_waypoints[i])
+        pen = 0.0
+        if self.env.collisions[i] > 0:
+            v = self.prev_vels[i]
+            pen = -0.05 * np.dot(v, v)
+        r = dist + pen
+        if not np.isfinite(r):
+            print(
+                f"[WARN] Agent {i} invalid reward dist={dist}, pen={pen}")
+            r = -1.0
+        return float(r)
 
     def _observation(self, idx: int, agent_obs: dict) -> np.ndarray:
         # agent_obs is already the per-agent observation dict from _convert_obs
@@ -560,11 +560,23 @@ class KohondaMultiAgentF110Env(MultiAgentF110):
         scan_data = np.atleast_1d(scan_data)    # Ensure always array, even if scalar
 
         # Get additional data from environment state
-        vx = float(self.env.poses_x[idx] - self.prev_waypoints[idx][0]) / \
-            self.env.timestep if hasattr(self.env, 'timestep') else 0.0
-        vy = float(self.env.poses_y[idx] - self.prev_waypoints[idx][1]) / \
-            self.env.timestep if hasattr(self.env, 'timestep') else 0.0
-        ang_v = 0.0  # We'll compute this differently
+        # Try to get velocities from environment first, then calculate from position difference
+        if hasattr(self.env, 'sim') and hasattr(self.env.sim, 'agents') and len(self.env.sim.agents) > idx:
+            agent_state = self.env.sim.agents[idx]
+            if hasattr(agent_state, 'standard_state'):
+                std_state = agent_state.standard_state
+                vx = float(std_state.get("v_x", 0.0))
+                vy = float(std_state.get("v_y", 0.0))
+                ang_v = float(std_state.get("yaw_rate", 0.0))
+            else:
+                vx = vy = ang_v = 0.0
+        else:
+            # Fallback: calculate from position difference
+            vx = float(self.env.poses_x[idx] - self.prev_waypoints[idx][0]) / \
+                self.env.timestep if hasattr(self.env, 'timestep') else 0.0
+            vy = float(self.env.poses_y[idx] - self.prev_waypoints[idx][1]) / \
+                self.env.timestep if hasattr(self.env, 'timestep') else 0.0
+            ang_v = 0.0
 
         dvx = vx - self.prev_vels[idx][0]
         dvy = vy - self.prev_vels[idx][1]
@@ -640,12 +652,20 @@ class KohondaMultiAgentF110Env(MultiAgentF110):
 
         if action_dict is not None:
             # Called from step
-            agent_state = self.env.sim.agents[i]
-            std_state = agent_state.standard_state
-            self.prev_vels[i] = np.array(
-                [std_state["v_x"], std_state["v_y"]], dtype=np.float32)
+            if hasattr(self.env, 'sim') and hasattr(self.env.sim, 'agents') and len(self.env.sim.agents) > i:
+                agent_state = self.env.sim.agents[i]
+                if hasattr(agent_state, 'standard_state'):
+                    std_state = agent_state.standard_state
+                    self.prev_vels[i] = np.array(
+                        [std_state.get("v_x", 0.0), std_state.get("v_y", 0.0)], dtype=np.float32)
+                    self.prev_yaw[i] = float(std_state.get("yaw", 0.0))
+                else:
+                    self.prev_vels[i] = np.zeros(2, dtype=np.float32)
+                    self.prev_yaw[i] = 0.0
+            else:
+                self.prev_vels[i] = np.zeros(2, dtype=np.float32)
+                self.prev_yaw[i] = 0.0
             self.prev_steer_angle[i] = float(action_dict[agent_id][1])
-            self.prev_yaw[i] = float(std_state["yaw"])
         else:
             # Called from reset
             self.prev_vels[i] = np.zeros(2, dtype=np.float32)
@@ -683,6 +703,9 @@ class KohondaMultiAgentF110Env(MultiAgentF110):
 
     def reset(self, **kwargs):
         original_obs, info = super().reset(**kwargs)
+
+        # Reset crashed agents set
+        self._crashed_agents = set()
 
         # Convert to custom observations for each agent
         custom_obs_dict = {}
