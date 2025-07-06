@@ -5,7 +5,7 @@
 training: &training
   timesteps_total: 3_000_000
   eval_interval:    2000
-  reward_function:  KohondaMultiAgentF110Env
+  reward_function:  ProgressRewardEnv
 
 evaluation: &evaluation
   episodes: 5
@@ -62,7 +62,7 @@ experiments:
     ppo_params:
       <<: *ppo_params
 
-  - name: oval_small_SACK_Shared_Policy
+  - name: oval_small_SAC_Shared_Policy
     storage_path: ../models
     training:
       <<: *training
@@ -75,10 +75,26 @@ experiments:
     sac_params:
       <<: *sac_params
 
-  - name: oval_small_SAC_Individual_Policies
+
+  - name: oval_small_SAC_Kohonda_Shared_Policy
     storage_path: ../models
     training:
       <<: *training
+      algorithm:     SAC
+      reward_function:  KohondaMultiAgentF110Env
+      shared_policy: true
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+    sac_params:
+      <<: *sac_params
+
+  - name: oval_small_SAC_Kohonda_Individual_Policies
+    storage_path: ../models
+    training:
+      <<: *training
+      reward_function:  KohondaMultiAgentF110Env
       algorithm:     SAC
       shared_policy: false
     evaluation:
