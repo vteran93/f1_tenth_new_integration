@@ -1,5 +1,5 @@
 # Ignore trained models and checkpoints
-models/
+*models*/
 build/
 gym/f110_gym.egg-info
 __pycache__
