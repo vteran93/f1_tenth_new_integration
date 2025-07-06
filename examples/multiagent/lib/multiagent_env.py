@@ -98,12 +98,39 @@ class MultiAgentF110(MultiAgentEnv, ABC):
         # Called to clean up resources when the environment is no longer needed.
         self.env.close()
 
-    @abstractmethod
     def _get_rewards(self, newly_crashed) -> list:
-        # Abstract method to be implemented by subclasses for reward calculation.
-        ''' Needs to be implemented by inheriting this class.
-         Returns a list of rewards for each agent based on the current state of the environment.'''
-        pass
+        """Iterates and computes rewards for each agent. 
+        Args:
+            newly_crashed (list): List of agents that crashed in this step.
+        Returns:
+            list: List of rewards for each agent.
+        """
+
+        # Initialize last_s tracking if not exists
+        if not hasattr(self, '_last_s'):
+            self._last_s = [0.0] * self.env.num_agents
+
+        rewards = []
+        for i in range(self.env.num_agents):
+            agent = self.agents[i]
+            reward = self._compute_reward(agent, newly_crashed, i)
+            rewards.append(reward)
+
+        return rewards
+    
+    @abstractmethod
+    def _compute_reward(self, agent, newly_crashed, i) -> float:
+        """Compute reward for a single agent.
+
+        Args:
+            agent (str): The ID of the agent (e.g., 'agent_0').
+            newly_crashed (list): List of agents that crashed in this step.
+            i (int): Index of the agent in the environment.
+
+        Returns:
+            float: The computed reward for the agent.
+        """
+        raise NotImplementedError("Subclasses must implement _compute_reward method.")
 
     # ------------------
     # Helper Methods

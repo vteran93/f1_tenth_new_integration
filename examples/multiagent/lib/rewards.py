@@ -1,113 +1,30 @@
-"""
-Consolidated reward functions for F1TENTH multi-agent racing environment.
-This file contains all optimized reward functions after redundancy elimination.
-
-Author: Victor
-Date: July 4, 2025
-"""
-
 import warnings
 from examples.multiagent.lib.multiagent_env import MultiAgentF110
 import numpy as np
 
-# Define deprecated decorator if not available
-try:
-    from warnings import deprecated
-except ImportError:
-    def deprecated(func):
-        """Fallback deprecated decorator for older Python versions."""
-        def wrapper(*args, **kwargs):
-            warnings.warn(f"{func.__name__} is deprecated", DeprecationWarning, stacklevel=2)
-            return func(*args, **kwargs)
-        return wrapper
-
-
-# ============================================================================
-# BASE CLASSES
-# ============================================================================
-
-class BaseReward:
-    """Base class for reward functions using polymorphism."""
-
-    def _get_rewards(self, env, newly_crashed):
-        """
-        Calculate rewards for each agent.
-
-        Args:
-            env: MultiAgentF110 environment instance
-            newly_crashed: Set of agents that crashed this step
-
-        Returns:
-            List of rewards for each agent
-        """
-        raise NotImplementedError("Subclasses must implement _get_rewards")
-
-
-class RewardFunction(MultiAgentF110):
-    """Abstract base class for reward functions."""
-
-    def __init__(self, env_config=None):
-        super().__init__(env_config=env_config)
-        # Store the F1TENTH environment instance to access state information
-
-    def _compute_reward(self, agent, newly_crashed, i):
-        """Compute reward for a single agent.
-
-        Args:
-            agent (str): The ID of the agent (e.g., 'agent_0').
-            newly_crashed (list): List of agents that crashed in this step.
-            i (int): Index of the agent in the environment.
-
-        Returns:
-            float: The computed reward for the agent.
-        """
-        raise NotImplementedError("Subclasses must implement _compute_reward")
-
-    def _get_rewards(self, newly_crashed) -> list:
-        """Calculate individual rewards for each agent."""
-
-        # Initialize last_s tracking if not exists
-        if not hasattr(self, '_last_s'):
-            self._last_s = [0.0] * self.env.num_agents
-
-        rewards = []
-        for i in range(self.env.num_agents):
-            agent = self.agents[i]
-            reward = self._compute_reward(agent, newly_crashed, i)
-            rewards.append(reward)
-
-        return rewards
-
-
-# ============================================================================
-# CONSOLIDATED REWARD FUNCTIONS
-# ============================================================================
+'''
+All these reward functions inherit from MultiAgentF110.
+All of these reward functions are IDEPENDENT, AGENTS DO NOT SHARE REWARDS !!!
+'''
 
 class ProgressRewardEnv(MultiAgentF110):
-    """Basic progress reward - original implementation that works."""
+    """
+    Basic progress reward.
+    
+    This is an adaptation of the original F110Env reward function.
+    It calculates rewards based on track progress and crash status.
+    Original reward function path: f1tenth_gym/envs/f110_env.py
+    """
 
     def __init__(self, env_config=None):
         super().__init__(env_config)
 
-    def _get_rewards(self, newly_crashed) -> list:
-        """Calculate individual rewards for each agent based on F110Env reward function."""
-
-        # Initialize last_s tracking if not exists
-        if not hasattr(self, '_last_s'):
-            self._last_s = [0.0] * self.env.num_agents
-
-        rewards = []
-        for i in range(self.env.num_agents):
-            agent = self.agents[i]
-            reward = self._compute_reward(agent, newly_crashed, i)
-            rewards.append(reward)
-
-        return rewards
-
     def _compute_reward(self, agent, newly_crashed, i):
         if agent in self._crashed_agents and agent not in newly_crashed:
             # Agent was already crashed - no reward calculation needed
-            reward = 0.0
+            # This reward won't be computed by the learning algorithm, so it doesn't matter
+            # what value we return here.
+            reward = np.nan # We will simply use np.nan
         else:
             # Calculate track progress using centerline spline
             current_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
@@ -134,7 +51,7 @@ class ProgressRewardEnv(MultiAgentF110):
         return reward
 
 
-class ProgressRewardAdvancedEnv(RewardFunction):
+class ProgressRewardAdvancedEnv(MultiAgentF110):
     """Advanced progress reward with enhanced scaling and crash handling."""
 
     def __init__(self, env_config=None):
@@ -186,7 +103,7 @@ class ProgressRewardAdvancedEnv(RewardFunction):
         return progress_reward + survival_reward
 
 
-class SpeedReward(RewardFunction):
+class SpeedReward(MultiAgentF110):
     """Speed-focused reward encouraging higher speeds with crash penalties."""
 
     def __init__(self, env_config=None):
@@ -279,8 +196,10 @@ class SpeedReward(RewardFunction):
         return total_reward
 
 
-class WaypointReward(RewardFunction):
-    """Waypoint-based reward encouraging structured track progression."""
+class WaypointReward(MultiAgentF110):
+    """Waypoint-based reward encouraging structured track progression.
+        This reward was adapted from https://github.com/BDEvan5/f1tenth_benchmarks/ ???
+    """
 
     def __init__(self, env_config=None):
         super().__init__(env_config=env_config)
@@ -373,7 +292,7 @@ class WaypointReward(RewardFunction):
         return reward
 
 
-class CompetitiveOvertakingReward(RewardFunction):
+class CompetitiveOvertakingReward(MultiAgentF110):
     """Competitive racing reward with lap completion, overtaking, and safety."""
 
     def __init__(self, env_config=None):
@@ -507,7 +426,7 @@ class CompetitiveOvertakingReward(RewardFunction):
         return reward
 
 
-class SafetyReward(RewardFunction):
+class SafetyReward(MultiAgentF110):
     """Safety-focused reward encouraging careful driving with LiDAR awareness."""
 
     def __init__(self, env_config=None):
@@ -551,8 +470,8 @@ class SafetyReward(RewardFunction):
             prog -= track_length  # Handle backward movement
 
         # Safety component (minimum distance to walls from LiDAR)
-        if hasattr(self.env, 'scans') and len(self.env.scans) > i:
-            min_scan_distance = np.min(self.env.scans[i])
+        if hasattr(self.env, 'sim') and hasattr(self.env.sim, 'agent_scans') and len(self.env.sim.agent_scans) > i:
+            min_scan_distance = np.min(self.env.sim.agent_scans[i])
             safety_reward = min_scan_distance * 0.5  # Reward staying away from walls
         else:
             # Fallback if scans not available
@@ -570,37 +489,3 @@ class SafetyReward(RewardFunction):
         self._last_s[i] = current_s
 
         return total_reward
-
-
-# ============================================================================
-# FACTORY FUNCTION
-# ============================================================================
-
-@deprecated
-def get_reward_function(reward_name, env):
-    """Factory function to return the appropriate reward function instance.
-
-    Args:
-        reward_name (str): Name of the reward function.
-        env: The F1TENTH environment instance.
-
-    Returns:
-        RewardFunction: An instance of the specified reward function class.
-
-    Raises:
-        ValueError: If the reward_name is not recognized.
-    """
-    reward_classes = {
-        "ProgressRewardEnv": ProgressRewardEnv,
-        "ProgressRewardAdvancedEnv": ProgressRewardAdvancedEnv,
-        "SpeedReward": SpeedReward,
-        "WaypointReward": WaypointReward,
-        "CompetitiveOvertakingReward": CompetitiveOvertakingReward,
-        "SafetyReward": SafetyReward
-    }
-
-    if reward_name not in reward_classes:
-        available_rewards = list(reward_classes.keys())
-        raise ValueError(f"Unknown reward function: {reward_name}. Available: {available_rewards}")
-
-    return reward_classes[reward_name](env)

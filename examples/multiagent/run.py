@@ -1,4 +1,5 @@
 import argparse
+import sys
 from lib.utils import (
     load_config,
     init_ray,
@@ -236,26 +237,44 @@ def run_evaluation(config, trial_name=None):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(prog=Path(__file__).stem, description='Run F1TENTH multi-agent training or evaluation.',
-                                     formatter_class=argparse.RawTextHelpFormatter
-                                     )
+    parser = argparse.ArgumentParser(
+        prog=Path(__file__).stem, 
+        description='Run F1TENTH multi-agent training or evaluation.',
+        formatter_class=argparse.RawTextHelpFormatter,
+        epilog="""
+            Examples:
+            python run.py train --experiment my_experiment
+            python run.py train --all
+            python run.py eval --experiment my_experiment
+            python run.py eval --experiment my_experiment --trial trial_123
+        """
+    )
     parser.add_argument(
-        '--config', type=Path, default=Path('configs/experiments.yaml'), help='Path to the experiments configuration file.')
+        '--config', type=Path, default=Path('configs/experiments.yaml'), 
+        help='Path to the experiments configuration file (default: configs/experiments.yaml)')
 
-    subparsers = parser.add_subparsers(title='Commands', dest='command', required=True,
-                                       help='Choose one of the available commands.')
+    subparsers = parser.add_subparsers(
+        title='Commands', 
+        dest='command', 
+        required=True, 
+        help='Available commands:',
+        description='Choose one of the following commands:'
+    )
 
     # Train parser
-    train_parser = subparsers.add_parser('train', help='Train one or more experiments.')
+    train_parser = subparsers.add_parser('train', help='Train one or more experiments')
     train_group = train_parser.add_mutually_exclusive_group(required=True)
-    train_group.add_argument('--experiment', type=str, help='Name of the experiment to run.')
-    train_group.add_argument('--all', action='store_true', help='Run all experiments from the config file.')
+    train_group.add_argument('--experiment', type=str, help='Name of the experiment to train')
+    train_group.add_argument('--all', action='store_true', help='Train all experiments from config file')
 
     # Eval parser
-    eval_parser = subparsers.add_parser('eval', help='Evaluate a trained model.')
-    eval_parser.add_argument('--experiment', type=str, required=True, help='Name of the experiment to run.')
-    eval_parser.add_argument('--trial', type=str, default=None,
-                             help='Specific trial to evaluate (uses best if not specified).')
+    eval_parser = subparsers.add_parser('eval', help='Evaluate a trained model')
+    eval_parser.add_argument('--experiment', type=str, required=True, help='Name of the experiment to evaluate')
+    eval_parser.add_argument('--trial', type=str, default=None, help='Specific trial to evaluate (optional, uses best trial if not specified)')
+
+    if len(sys.argv) == 1:  # Si no se pasan argumentos
+        parser.print_help()  # Mostrar el mensaje de ayuda
+        sys.exit(0)  # Salir del programa
 
     args = parser.parse_args()
 

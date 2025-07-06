@@ -447,7 +447,7 @@ class AverageSpeed(RLlibCallback):
 
 CALLBACKS = [
     # EpisodeDuration, # Fixed
-    # LapProgress, # Ok
+    LapProgress, # Ok
     # LapTimeProxy,# ok
     # CollisionStats, #ok
     AverageSpeed,
