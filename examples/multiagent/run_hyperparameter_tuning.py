@@ -7,7 +7,7 @@ from ray import tune
 from ray.tune.search.optuna import OptunaSearch
 from ray.rllib.algorithms.ppo import PPO as PPOTrainer, PPOConfig
 from lib.utils import load_config, init_ray, get_logger, suppress_warnings
-from lib.rewards import ProgressRewardEnv
+from examples.multiagent.lib.rewards import ProgressRewardEnv
 from ray.tune.registry import register_env
 from ray.rllib.policy.policy import PolicySpec
 
@@ -34,8 +34,9 @@ search_space = {
     "num_sgd_iter": tune.choice([5, 10, 20]),
     "sgd_minibatch_size": tune.choice([64, 128, 256]),
     "entropy_coeff": tune.uniform(0.0, 0.05),
-    "model": {"fcnet_hiddens": tune.choice([(128, 128), (256, 256), (256, 128)])} 
+    "model": {"fcnet_hiddens": tune.choice([(128, 128), (256, 256), (256, 128)])}
 }
+
 
 def policy_dict():
     temp_env = MultiAgentF110(get_env_config())
@@ -43,6 +44,7 @@ def policy_dict():
                 for agent in temp_env.agents}
     temp_env.close()
     return policies
+
 
 # --- Configuración base sin hiperparámetros ---
 base_cfg = (
@@ -81,6 +83,7 @@ tune.run(
     mode="max"
 )
 
+
 @click.command()
 @click.option("--train", is_flag=True, help="Train the model")
 @click.option("--resume", is_flag=True, help="Resume training from a checkpoint")
@@ -97,40 +100,41 @@ def main(train, resume, eval, config_path):
         # Evaluation logic will be added here
         pass
 
+
 def run_training(config, resume):
     env_config = load_config(f"examples/multiagent/configs/{config['env_config']}")
     temp_env = ProgressRewardEnv(env_config)
-    policies = {agent: PolicySpec(None, temp_env.observation_space, temp_env.action_space, {}) 
+    policies = {agent: PolicySpec(None, temp_env.observation_space, temp_env.action_space, {})
                 for agent in temp_env.agents}
     temp_env.close()
 
     ppo_config_file = load_config(f"examples/multiagent/configs/{config['ppo_config']}")
     config_ppo = (PPOConfig()
-              .environment(ProgressRewardEnv, env_config=env_config)
-              .framework("torch")
-              .api_stack(enable_rl_module_and_learner=False, enable_env_runner_and_connector_v2=False)
-              .env_runners(
-                  num_env_runners=0, 
+                  .environment(ProgressRewardEnv, env_config=env_config)
+                  .framework("torch")
+                  .api_stack(enable_rl_module_and_learner=False, enable_env_runner_and_connector_v2=False)
+                  .env_runners(
+                  num_env_runners=0,
                   num_envs_per_env_runner=1,
-              )
-              .multi_agent(
-                  policies=policies, 
+                  )
+                  .multi_agent(
+                  policies=policies,
                   policy_mapping_fn=lambda agent_id, *args, **kwargs: agent_id
-              )
-              .training(
+                  )
+                  .training(
                   train_batch_size=tune.grid_search(config["hyperparameters"]["train_batch_size"]),
                   lr=tune.grid_search(config["hyperparameters"]["lr"])
-              )
-              .evaluation(
+                  )
+                  .evaluation(
                   evaluation_interval=config["evaluation_interval"],
                   evaluation_num_env_runners=1,
                   evaluation_config={
                       "seed": 42
                   }
-              )
-              .debugging(
+                  )
+                  .debugging(
                   seed=42
-              ))
+                  ))
 
     tune.run(
         "PPO",
@@ -138,9 +142,10 @@ def run_training(config, resume):
         stop={"timesteps_total": config["total_timesteps"]},
         checkpoint_freq=10,
         storage_path="ray_results",
-        name=config["experiment_name"], 
+        name=config["experiment_name"],
         resume=resume
     )
+
 
 if __name__ == "__main__":
     main()

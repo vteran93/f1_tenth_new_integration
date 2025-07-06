@@ -1,11 +1,13 @@
+from scipy.interpolate import splev, splrep
 import yaml
 import ray
 import logging
 import os
 import warnings
 import importlib
-from ray.tune.callback import Callback
 from ray.tune.analysis import ExperimentAnalysis
+import numpy as np
+from numba import njit
 
 
 def load_config(path):
@@ -77,3 +79,130 @@ def find_experiment(experiments, experiment_name):
         logger.error(f"Experiment '{experiment_name}' not found. Available: {available}")
         exit(1)
     return experiment
+
+
+def calculate_curvatures(points: np.ndarray) -> np.ndarray:
+    """
+    Calculate signed curvature for a sequence of points.
+    Args:
+        points: array of shape (N,2)
+    Returns:
+        curvatures: array of length N
+    """
+    x = points[:, 0]
+    y = points[:, 1]
+    t = np.arange(len(x), dtype=np.float64)
+    spl_x = splrep(t, x.astype(np.float64))
+    spl_y = splrep(t, y.astype(np.float64))
+    dx = splev(t, spl_x, der=1)
+    ddx = splev(t, spl_x, der=2)
+    dy = splev(t, spl_y, der=1)
+    ddy = splev(t, spl_y, der=2)
+    denom = np.maximum((dx**2 + dy**2)**1.5, 1e-6)
+    curv = (dx * ddy - dy * ddx) / denom
+    return curv.astype(np.float32)
+
+
+@njit(fastmath=False, cache=True)
+def nearest_point_on_trajectory(point, trajectory):
+    """
+    Return the nearest point along the given piecewise linear trajectory.
+    """
+    diffs = trajectory[1:, :] - trajectory[:-1, :]
+    l2s = diffs[:, 0] ** 2 + diffs[:, 1] ** 2
+    dots = np.empty((trajectory.shape[0] - 1,))
+    for i in range(dots.shape[0]):
+        dots[i] = np.dot((point - trajectory[i, :]), diffs[i, :])
+    t = dots / l2s
+    t[t < 0.0] = 0.0
+    t[t > 1.0] = 1.0
+    projections = trajectory[:-1, :] + (t * diffs.T).T
+    dists = np.empty((projections.shape[0],))
+    for i in range(dists.shape[0]):
+        temp = point - projections[i]
+        dists[i] = np.sqrt(np.sum(temp * temp))
+    min_dist_segment = np.argmin(dists)
+    return (
+        projections[min_dist_segment],
+        dists[min_dist_segment],
+        t[min_dist_segment],
+        min_dist_segment,
+    )
+
+
+@njit(fastmath=False, cache=True)
+def first_point_on_trajectory_intersecting_circle(
+    point, radius, trajectory, t=0.0, wrap=False
+):
+    """
+    Encuentra el primer punto en la trayectoria que intersecta con un círculo.
+    """
+    start_i = int(t)
+    start_t = t % 1.0
+    first_t = None
+    first_i = None
+    first_p = None
+    trajectory = np.ascontiguousarray(trajectory)
+
+    for i in range(start_i, trajectory.shape[0] - 1):
+        start = trajectory[i, :]
+        end = trajectory[i + 1, :] + 1e-6
+        V = np.ascontiguousarray(end - start).astype(np.float32)
+
+        a = np.dot(V, V)
+        b = np.float32(2.0) * np.dot(V, start - point)
+        c = (
+            np.dot(start, start)
+            + np.dot(point, point)
+            - np.float32(2.0) * np.dot(start, point)
+            - radius * radius
+        )
+        discriminant = b * b - 4 * a * c
+
+        if discriminant < 0:
+            continue
+
+        discriminant = np.sqrt(discriminant)
+        t1 = (-b - discriminant) / (2.0 * a)
+        t2 = (-b + discriminant) / (2.0 * a)
+
+        if i == start_i:
+            if t1 >= 0.0 and t1 <= 1.0 and t1 >= start_t:
+                first_t = t1
+                first_i = i
+                first_p = start + t1 * V
+                break
+            if t2 >= 0.0 and t2 <= 1.0 and t2 >= start_t:
+                first_t = t2
+                first_i = i
+                first_p = start + t2 * V
+                break
+        elif t1 >= 0.0 and t1 <= 1.0:
+            first_t = t1
+            first_i = i
+            first_p = start + t1 * V
+            break
+        elif t2 >= 0.0 and t2 <= 1.0:
+            first_t = t2
+            first_i = i
+            first_p = start + t2 * V
+            break
+
+    return first_p, first_i, first_t
+
+
+@njit(fastmath=False, cache=True)
+def get_actuation(pose_theta, lookahead_point, position, lookahead_distance, wheelbase):
+    """
+    Calcula la actuación (velocidad y ángulo de dirección) para seguir un punto objetivo.
+    """
+    waypoint_y = np.dot(
+        np.array([np.sin(-pose_theta), np.cos(-pose_theta)], dtype=np.float32),
+        lookahead_point[0:2] - position,
+    )
+    speed = lookahead_point[2]
+    if np.abs(waypoint_y) < 1e-6:
+        return speed, 0.0
+    radius = 1 / (2.0 * waypoint_y / lookahead_distance**2)
+    steering_angle = np.arctan(wheelbase / radius)
+    return speed, steering_angle

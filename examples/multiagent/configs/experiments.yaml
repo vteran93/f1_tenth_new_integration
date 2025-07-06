@@ -3,9 +3,9 @@
 # This are the anchors used to avoid repetition in the YAML file.
 # Anchors are used to define common configurations that can be reused across different experiments.
 training: &training
-  timesteps_total: 3_000_000
+  timesteps_total: 30_000
   eval_interval:    2000
-  reward_function:  ProgressRewardEnv
+  reward_function:  KohondaMultiAgentF110Env
 
 evaluation: &evaluation
   episodes: 5
