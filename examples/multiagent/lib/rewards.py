@@ -1,11 +1,3 @@
-"""
-Consolidated reward functions for F1TENTH multi-agent racing environment.
-This file contains all optimized reward functions after redundancy elimination.
-
-Author: Victor
-Date: July 4, 2025
-"""
-
 from examples.multiagent.lib.utils import nearest_point_on_trajectory, calculate_curvatures
 import warnings
 from examples.multiagent.lib.multiagent_env import MultiAgentF110
@@ -113,7 +105,7 @@ class ProgressRewardAdvancedEnv(MultiAgentF110):
         return progress_reward + survival_reward
 
 
-class SpeedReward(MultiAgentF110):
+class SpeedRewardEnv(MultiAgentF110):
     """Speed-focused reward encouraging higher speeds with crash penalties."""
 
     def __init__(self, env_config=None):
@@ -147,7 +139,7 @@ class SpeedReward(MultiAgentF110):
             return -5.0  # Large penalty for crashing
 
         # Calculate track progress using centerline spline
-        current_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
+        current_s, _ = self.env.track.raceline.spline.calc_arclength_inaccurate(
             float(self.env.poses_x[i]), float(self.env.poses_y[i])
         )
 
@@ -169,7 +161,7 @@ class SpeedReward(MultiAgentF110):
 
         # Calculate speed from track progress (primary method)
         progress = current_s - self._last_s[i]
-        track_length = self.env.track.centerline.spline.s[-1]
+        track_length = self.env.track.raceline.spline.s[-1]
 
         # Handle track loop completion
         if progress < -0.5 * track_length:
@@ -206,10 +198,12 @@ class SpeedReward(MultiAgentF110):
         return total_reward
 
 
-class WaypointReward(MultiAgentF110):
+class WaypointRewardEnv(MultiAgentF110):
     """
     Waypoint-based reward encouraging structured track progression.
-    This reward was adapted from https://github.com/BDEvan5/f1tenth_benchmarks/ ??? PEPE
+    This reward was INSPIRED from https://github.com/BDEvan5/f1tenth_benchmarks/ but it is considerably different.
+    It incorporates elements consistent with the design principles of the original repository and combines features
+    of the different existing reward types (Progress, TAL, CTH)
     """
 
     def __init__(self, env_config=None):
@@ -303,141 +297,141 @@ class WaypointReward(MultiAgentF110):
         return reward
 
 
-class CompetitiveOvertakingReward(MultiAgentF110):
-    """Competitive racing reward with lap completion, overtaking, and safety."""
+# class CompetitiveOvertakingRewardEnv(MultiAgentF110):
+#     """Competitive racing reward with lap completion, overtaking, and safety."""
 
-    def __init__(self, env_config=None):
-        super().__init__(env_config=env_config)
-        # Initialize last_s tracking for each agent
-        if not hasattr(self, '_last_s'):
-            self._last_s = [0.0] * self.env.num_agents
+#     def __init__(self, env_config=None):
+#         super().__init__(env_config=env_config)
+#         # Initialize last_s tracking for each agent
+#         if not hasattr(self, '_last_s'):
+#             self._last_s = [0.0] * self.env.num_agents
 
-        # Compute arc lengths for waypoints from xs, ys
-        xs, ys = self.env.track.centerline.xs, self.env.track.centerline.ys
+#         # Compute arc lengths for waypoints from xs, ys
+#         xs, ys = self.env.track.centerline.xs, self.env.track.centerline.ys
 
-        # Verify xs and ys dimensions (expecting 1692 for specific track)
-        if len(xs) != 1692 or len(ys) != 1692:
-            warnings.warn(f"Expected 1692 waypoints, got {len(xs)} for xs and {len(ys)} for ys")
+#         # Verify xs and ys dimensions (expecting 1692 for specific track)
+#         if len(xs) != 1692 or len(ys) != 1692:
+#             warnings.warn(f"Expected 1692 waypoints, got {len(xs)} for xs and {len(ys)} for ys")
 
-        # Calculate distances between consecutive waypoints
-        distances = np.sqrt(np.diff(xs)**2 + np.diff(ys)**2)
-        # Compute cumulative arc lengths
-        self.waypoint_s = np.concatenate(([0.0], np.cumsum(distances)))
-        self.num_waypoints = len(self.waypoint_s)
+#         # Calculate distances between consecutive waypoints
+#         distances = np.sqrt(np.diff(xs)**2 + np.diff(ys)**2)
+#         # Compute cumulative arc lengths
+#         self.waypoint_s = np.concatenate(([0.0], np.cumsum(distances)))
+#         self.num_waypoints = len(self.waypoint_s)
 
-        # Track the last arc length threshold and arc length for each agent
-        self.last_s_threshold = {
-            agent: 0.0 for agent in [f"agent_{i}" for i in range(self.env.num_agents)]
-        }
-        # Track relative positions to detect overtaking
-        self.was_behind = {
-            agent: {
-                other: False for other in [f"agent_{i}" for i in range(self.env.num_agents)]
-            } for agent in [f"agent_{i}" for i in range(self.env.num_agents)]
-        }
-        # Timestep for speed calculation
-        self.timestep = self.env.config.get("timestep", 0.01)
-        self.threshold_distance = 1.0  # Meters for "waypoints"
-        # Store crashed agents to avoid repeated calculations
-        self._crashed_agents = set()
+#         # Track the last arc length threshold and arc length for each agent
+#         self.last_s_threshold = {
+#             agent: 0.0 for agent in [f"agent_{i}" for i in range(self.env.num_agents)]
+#         }
+#         # Track relative positions to detect overtaking
+#         self.was_behind = {
+#             agent: {
+#                 other: False for other in [f"agent_{i}" for i in range(self.env.num_agents)]
+#             } for agent in [f"agent_{i}" for i in range(self.env.num_agents)]
+#         }
+#         # Timestep for speed calculation
+#         self.timestep = self.env.config.get("timestep", 0.01)
+#         self.threshold_distance = 1.0  # Meters for "waypoints"
+#         # Store crashed agents to avoid repeated calculations
+#         self._crashed_agents = set()
 
-    def _compute_reward(self, agent, newly_crashed, i):
-        """Calculate reward based on lap completion, overtaking, speed, and safety.
+#     def _compute_reward(self, agent, newly_crashed, i):
+#         """Calculate reward based on lap completion, overtaking, speed, and safety.
 
-        Features:
-        - Passing arc length thresholds (+1.0 per threshold)
-        - Completing a lap (+10.0)
-        - Overtaking another agent (+5.0 per overtake)
-        - Speed reward (progress per timestep × 0.5)
-        - Survival bonus (+0.01)
-        - Proximity penalty (-0.1 × distance if < 0.5m)
-        - Crash penalty (-5.0)
-        """
-        if agent in self._crashed_agents and agent not in newly_crashed:
-            return 0.0
+#         Features:
+#         - Passing arc length thresholds (+1.0 per threshold)
+#         - Completing a lap (+10.0)
+#         - Overtaking another agent (+5.0 per overtake)
+#         - Speed reward (progress per timestep × 0.5)
+#         - Survival bonus (+0.01)
+#         - Proximity penalty (-0.1 × distance if < 0.5m)
+#         - Crash penalty (-5.0)
+#         """
+#         if agent in self._crashed_agents and agent not in newly_crashed:
+#             return 0.0
 
-        # Track newly crashed agents
-        if agent in newly_crashed:
-            self._crashed_agents.add(agent)
-            return -5.0  # Large penalty for crashing
+#         # Track newly crashed agents
+#         if agent in newly_crashed:
+#             self._crashed_agents.add(agent)
+#             return -5.0  # Large penalty for crashing
 
-        # Calculate track progress using centerline spline
-        current_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
-            float(self.env.poses_x[i]), float(self.env.poses_y[i])
-        )
+#         # Calculate track progress using centerline spline
+#         current_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
+#             float(self.env.poses_x[i]), float(self.env.poses_y[i])
+#         )
 
-        # Initialize reward
-        reward = 0.0
-        track_length = self.env.track.centerline.spline.s[-1]
+#         # Initialize reward
+#         reward = 0.0
+#         track_length = self.env.track.centerline.spline.s[-1]
 
-        # --- Threshold Progress ---
-        if current_s < self._last_s[i] and (self._last_s[i] - current_s) > 0.5 * track_length:
-            reward += 10.0  # Bonus for completing a lap
-            self.last_s_threshold[agent] = 0.0  # Reset threshold
+#         # --- Threshold Progress ---
+#         if current_s < self._last_s[i] and (self._last_s[i] - current_s) > 0.5 * track_length:
+#             reward += 10.0  # Bonus for completing a lap
+#             self.last_s_threshold[agent] = 0.0  # Reset threshold
 
-        last_threshold = self.last_s_threshold[agent]
-        current_threshold = np.floor(current_s / self.threshold_distance) * self.threshold_distance
-        thresholds_passed = int((current_threshold - last_threshold) / self.threshold_distance)
+#         last_threshold = self.last_s_threshold[agent]
+#         current_threshold = np.floor(current_s / self.threshold_distance) * self.threshold_distance
+#         thresholds_passed = int((current_threshold - last_threshold) / self.threshold_distance)
 
-        if thresholds_passed < 0 and current_s < self._last_s[i]:
-            thresholds_passed = int((track_length - last_threshold + current_s) / self.threshold_distance)
+#         if thresholds_passed < 0 and current_s < self._last_s[i]:
+#             thresholds_passed = int((track_length - last_threshold + current_s) / self.threshold_distance)
 
-        reward += thresholds_passed * 1.0  # Reward for passing thresholds
-        self.last_s_threshold[agent] = current_threshold
+#         reward += thresholds_passed * 1.0  # Reward for passing thresholds
+#         self.last_s_threshold[agent] = current_threshold
 
-        # --- Overtaking Reward ---
-        agent_x, agent_y = float(self.env.poses_x[i]), float(self.env.poses_y[i])
+#         # --- Overtaking Reward ---
+#         agent_x, agent_y = float(self.env.poses_x[i]), float(self.env.poses_y[i])
 
-        for other_idx, other_agent in enumerate([f"agent_{j}" for j in range(self.env.num_agents)]):
-            if other_agent == agent:
-                continue
+#         for other_idx, other_agent in enumerate([f"agent_{j}" for j in range(self.env.num_agents)]):
+#             if other_agent == agent:
+#                 continue
 
-            other_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
-                float(self.env.poses_x[other_idx]), float(self.env.poses_y[other_idx])
-            )
+#             other_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
+#                 float(self.env.poses_x[other_idx]), float(self.env.poses_y[other_idx])
+#             )
 
-            # Check for overtaking
-            if self.was_behind[agent][other_agent] and current_s > other_s:
-                reward += 5.0  # Reward for overtaking
-                self.was_behind[agent][other_agent] = False
+#             # Check for overtaking
+#             if self.was_behind[agent][other_agent] and current_s > other_s:
+#                 reward += 5.0  # Reward for overtaking
+#                 self.was_behind[agent][other_agent] = False
 
-            # Update relative positions
-            if current_s <= other_s:
-                self.was_behind[agent][other_agent] = True
-            else:
-                self.was_behind[other_agent][agent] = True
+#             # Update relative positions
+#             if current_s <= other_s:
+#                 self.was_behind[agent][other_agent] = True
+#             else:
+#                 self.was_behind[other_agent][agent] = True
 
-        # --- Proximity Penalty ---
-        for other_idx, other_agent in enumerate([f"agent_{j}" for j in range(self.env.num_agents)]):
-            if other_agent == agent:
-                continue
+#         # --- Proximity Penalty ---
+#         for other_idx, other_agent in enumerate([f"agent_{j}" for j in range(self.env.num_agents)]):
+#             if other_agent == agent:
+#                 continue
 
-            other_x, other_y = float(self.env.poses_x[other_idx]), float(self.env.poses_y[other_idx])
-            distance = np.sqrt((agent_x - other_x)**2 + (agent_y - other_y)**2)
+#             other_x, other_y = float(self.env.poses_x[other_idx]), float(self.env.poses_y[other_idx])
+#             distance = np.sqrt((agent_x - other_x)**2 + (agent_y - other_y)**2)
 
-            if distance < 0.5:
-                reward += -0.1 * distance  # Penalty for being too close
+#             if distance < 0.5:
+#                 reward += -0.1 * distance  # Penalty for being too close
 
-        # --- Speed Reward ---
-        progress = current_s - self._last_s[i]
-        if progress < -0.5 * track_length:
-            progress += track_length
-        elif progress > 0.5 * track_length:
-            progress -= track_length
+#         # --- Speed Reward ---
+#         progress = current_s - self._last_s[i]
+#         if progress < -0.5 * track_length:
+#             progress += track_length
+#         elif progress > 0.5 * track_length:
+#             progress -= track_length
 
-        speed = progress / self.timestep
-        reward += speed * 0.5  # Reward proportional to speed
+#         speed = progress / self.timestep
+#         reward += speed * 0.5  # Reward proportional to speed
 
-        # --- Survival Bonus ---
-        reward += 0.01
+#         # --- Survival Bonus ---
+#         reward += 0.01
 
-        # Update last arc length
-        self._last_s[i] = current_s
+#         # Update last arc length
+#         self._last_s[i] = current_s
 
-        return reward
+#         return reward
 
 
-class SafetyReward(MultiAgentF110):
+class SafetyRewardEnv(MultiAgentF110):
     """Safety-focused reward encouraging careful driving with LiDAR awareness."""
 
     def __init__(self, env_config=None):
