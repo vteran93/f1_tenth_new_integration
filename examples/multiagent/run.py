@@ -9,7 +9,8 @@ from lib.utils import (
     get_best_checkpoint,
     get_reward_class,
     setup_experiment_config,
-    find_experiment
+    find_experiment,
+    validate_hyperparameter_config
 )
 from lib.callbacks import SaveConfig, MultipleAgentCallbacks
 from ray import tune
@@ -19,6 +20,7 @@ from ray.rllib.policy.policy import PolicySpec
 from ray.rllib.algorithms.algorithm import Algorithm
 from ray.tune.analysis import ExperimentAnalysis
 from ray.tune.stopper import TrialPlateauStopper, CombinedStopper, Stopper
+from ray.tune.search.optuna import OptunaSearch
 from pathlib import Path
 
 suppress_warnings()
@@ -28,6 +30,8 @@ ALGO_MAP = {
     "PPO": (PPOConfig, "ppo_params"),
     "SAC": (SACConfig, "sac_params"),
 }
+
+SEED = 42
 
 
 class TimestepsStopper(Stopper):
@@ -77,14 +81,14 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn):
         .evaluation(
             evaluation_interval=config["training"]["eval_interval"],
             evaluation_num_env_runners=1,
-            evaluation_config={"seed": 42},
+            evaluation_config={"seed": SEED},
         )
         .env_runners(
-            num_env_runners=8,             # Número de procesos paralelos (<=CPUs)
-            num_envs_per_env_runner=2,     # Entornos vectorizados por proceso
+            num_env_runners=8,             # Number of parallel processes (<= CPUs)
+            num_envs_per_env_runner=2,     # Vectorized environments per process
             gym_env_vectorize_mode="ASYNC"
         )
-        .debugging(seed=42)
+        .debugging(seed=SEED)
     )
 
     algo_config.training(**algo_config_file)
@@ -150,6 +154,24 @@ def run_training(config):
         timesteps_stopper
     )
 
+    # Setup search algorithm for hyperparameter tuning
+    tune_kwargs = {}
+    
+    # Validate hyperparameter configuration
+    validate_hyperparameter_config(config)
+    
+    hyperparameter_tuning = config.get("hyperparameter_tuning", False)
+    
+    if hyperparameter_tuning:
+        default_metric = "env_runners/episode_reward_mean"
+        search_alg = OptunaSearch(metric=default_metric, mode="max", seed=SEED)
+        tune_kwargs["search_alg"] = search_alg
+        tune_kwargs["num_samples"] = config["num_samples"]
+        logger.info(f"Hyperparameter tuning enabled with {tune_kwargs['num_samples']} trials")
+    else:
+        tune_kwargs["num_samples"] = 1
+        logger.info("Hyperparameter tuning disabled. Using num_samples=1 for single trial run.")
+
     tune.run(
         algorithm_name,
         config=config_algo.to_dict(),
@@ -166,6 +188,7 @@ def run_training(config):
         resume="AUTO+ERRORED",
         callbacks=[SaveConfig(config)],
         max_failures=5,  # Allow up to 3 failures before stopping the trial
+        **tune_kwargs
     )
 
 
