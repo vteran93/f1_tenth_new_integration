@@ -10,8 +10,6 @@ import os
 import warnings
 import importlib
 from ray.tune.analysis import ExperimentAnalysis
-<< << << < HEAD
-== == == =
 
 
 class TuneLoader(yaml.SafeLoader):
@@ -59,9 +57,6 @@ class TuneLoader(yaml.SafeLoader):
             return tune_func(*parsed_args)
         except Exception as e:
             raise ValueError(f"Failed to parse arguments for {func_name}: {args_str}. Error: {e}")
-
-
->>>>>> > e9c7c08ead044cc205d53f5d5f9bf41421990afa
 
 
 def load_config(path):
