@@ -7,7 +7,6 @@ Date: July 4, 2025
 """
 
 from examples.multiagent.lib.utils import nearest_point_on_trajectory, calculate_curvatures
-from typing import Any, Tuple
 import warnings
 from examples.multiagent.lib.multiagent_env import MultiAgentF110
 import numpy as np
@@ -503,215 +502,95 @@ class SafetyReward(MultiAgentF110):
 
 
 class KohondaMultiAgentF110Env(MultiAgentF110):
+    """
+    Kohonda-style reward function adapted for multi-agent racing.
 
-    def __init__(self, env_config={}):
-        super().__init__(env_config)
-        # Raceline waypoints
+    Based on the original implementation from:
+    https://github.com/kohonda/f1tenth_rl/blob/main/src/f1tenth_wrapper/env.py
+
+    Features:
+    - Waypoint-based progress reward
+    - Collision penalty scaled by speed
+    - Individual agent independence
+    """
+
+    def __init__(self, env_config=None):
+        super().__init__(env_config=env_config)
+
+        # Initialize waypoints from raceline
         self._waypoints = np.stack(
-            [self.env.track.raceline.xs, self.env.track.raceline.ys], axis=-1).astype(np.float32)
-        # State per agent
-        self._current_waypoints = np.zeros(
-            (self.env.num_agents, 2), dtype=np.float32)
+            [self.env.track.raceline.xs, self.env.track.raceline.ys], axis=-1
+        ).astype(np.float32)
+
+        # Per-agent state tracking
+        self._current_waypoints = np.zeros((self.env.num_agents, 2), dtype=np.float32)
         self._current_indices = np.zeros((self.env.num_agents,), dtype=int)
         self.prev_waypoints = np.zeros((self.env.num_agents, 2), dtype=np.float32)
         self.prev_vels = np.zeros((self.env.num_agents, 2), dtype=np.float32)
         self.prev_steer_angle = np.zeros(self.env.num_agents, dtype=np.float32)
         self.prev_yaw = np.zeros(self.env.num_agents, dtype=np.float32)
-        # Initialize crashed agents set
+
+        # Store crashed agents to avoid repeated calculations
         self._crashed_agents = set()
 
-        # Override observation space to match our custom vectorized observation
-        # The observation has 29 elements: 6 velocities + 1 yaw_dev + 18 depths + 4 additional features
-        import gymnasium as gym
-        # Multi-agent: use single agent space like the base class
-        single_agent_space = gym.spaces.Box(
-            low=-1e30, high=1e30, shape=(29,), dtype=np.float32
-        )
-        self.observation_space = single_agent_space
-
-    def calc_current_waypoint(self, idx: int) -> Tuple[np.ndarray, int]:
-        pos = np.array([self.env.poses_x[idx], self.env.poses_y[idx]],
-                       dtype=self._waypoints.dtype)
-        pt, _, _, index = nearest_point_on_trajectory(
-            point=pos, trajectory=self._waypoints)
-        return pt, int(index)
-
     def _compute_reward(self, agent, newly_crashed, i) -> float:
-        # Calculate reward only for the specific agent (not sum of all agents)
-        dist = np.linalg.norm(
-            self._current_waypoints[i] - self.prev_waypoints[i])
-        pen = 0.0
-        if self.env.collisions[i] > 0:
-            v = self.prev_vels[i]
-            pen = -0.05 * np.dot(v, v)
-        r = dist + pen
-        if not np.isfinite(r):
-            print(
-                f"[WARN] Agent {i} invalid reward dist={dist}, pen={pen}")
-            r = -1.0
-        return float(r)
-
-    def _observation(self, idx: int, agent_obs: dict) -> np.ndarray:
-        # agent_obs is already the per-agent observation dict from _convert_obs
-        # {'ego_idx': 0, 'scans': array([...]), 'poses_x': scalar, 'poses_theta': scalar, ...}
-
-        # Get scan data from the agent observation
-        scan_data = agent_obs['scans']  # This is already the agent's scan data
-        scan_data = np.atleast_1d(scan_data)    # Ensure always array, even if scalar
-
-        # Get additional data from environment state
-        # Try to get velocities from environment first, then calculate from position difference
-        if hasattr(self.env, 'sim') and hasattr(self.env.sim, 'agents') and len(self.env.sim.agents) > idx:
-            agent_state = self.env.sim.agents[idx]
-            if hasattr(agent_state, 'standard_state'):
-                std_state = agent_state.standard_state
-                vx = float(std_state.get("v_x", 0.0))
-                vy = float(std_state.get("v_y", 0.0))
-                ang_v = float(std_state.get("yaw_rate", 0.0))
-            else:
-                vx = vy = ang_v = 0.0
-        else:
-            # Fallback: calculate from position difference
-            vx = float(self.env.poses_x[idx] - self.prev_waypoints[idx][0]) / \
-                self.env.timestep if hasattr(self.env, 'timestep') else 0.0
-            vy = float(self.env.poses_y[idx] - self.prev_waypoints[idx][1]) / \
-                self.env.timestep if hasattr(self.env, 'timestep') else 0.0
-            ang_v = 0.0
-
-        dvx = vx - self.prev_vels[idx][0]
-        dvy = vy - self.prev_vels[idx][1]
-
-        yaw = float(self.env.poses_theta[idx])
-        index = self._current_indices[idx]
-        next_idx = (index + 1) % len(self._waypoints)
-        dx = self._waypoints[next_idx, 0] - self._waypoints[index, 0]
-        dy = self._waypoints[next_idx, 1] - self._waypoints[index, 1]
-        yaw_ref = np.arctan2(dy, dx)
-        yaw_dev = np.arctan2(np.sin(yaw - yaw_ref), np.cos(yaw - yaw_ref))
-
-        # Reduce scan to 18 elements and ensure it's a 1D array
-        if len(scan_data) > 18:
-            idxs = np.linspace(0, len(scan_data) - 1, num=18, dtype=int)
-            depths = scan_data[idxs]
-        else:
-            depths = scan_data
-
-        # Flatten and ensure we have exactly 18 elements
-        depths = np.asarray(depths).flatten()
-        if len(depths) < 18:
-            # Pad with zeros if needed
-            depths = np.pad(depths, (0, 18 - len(depths)), mode='constant')
-        elif len(depths) > 18:
-            depths = depths[:18]
-
-        ahead = np.stack([self._waypoints[(index + j) %
-                         len(self._waypoints)] for j in range(10)])
-        curvs = calculate_curvatures(ahead)
-        path_curv = curvs[0]
-
-        delta = yaw - self.prev_yaw[idx]
-        delta_yaw = np.arctan2(np.sin(delta), np.cos(delta))
-
-        # Create vectorized observation (29 elements total)
-        obs = np.zeros(29, dtype=np.float32)
-        obs[0:6] = [vx, vy, ang_v, dvx, dvy, ang_v]
-        obs[6] = yaw_dev
-        obs[7:25] = depths  # Now guaranteed to be exactly 18 elements
-        obs[25] = self.prev_steer_angle[idx]
-        obs[26] = path_curv
-        obs[27] = float(self.env.collisions[idx])
-        obs[28] = delta_yaw
-
-        if not np.all(np.isfinite(obs)):
-            raise ValueError(f"Invalid observation agent {idx}: {obs}")
-
-        return obs
-
-    def _update_agent_state_and_obs(self, i, obs_dict, action_dict=None):
         """
-        Helper to update agent state and construct observation for agent i.
-        Used by both step and reset to avoid code duplication.
+        Compute Kohonda-style reward for individual agent.
+
+        Features:
+        - Progress reward based on waypoint distance
+        - Collision penalty scaled by velocity
+        - Independent per-agent calculation
         """
+        if agent in self._crashed_agents and agent not in newly_crashed:
+            return 0.0
+
+        # Track newly crashed agents
+        if agent in newly_crashed:
+            self._crashed_agents.add(agent)
+            return -1.0  # Collision penalty
+
+        # Update current waypoint
         pt, idx = self.calc_current_waypoint(i)
         self._current_waypoints[i] = pt
         self._current_indices[i] = idx
 
-        # Get the agent's observation from the obs_dict
-        agent_id = self.agents[i]
-        if isinstance(obs_dict, dict) and agent_id in obs_dict:
-            # From step() - obs_dict is already converted to per-agent format
-            agent_obs = obs_dict[agent_id]
-        else:
-            # From reset() - obs_dict is the raw observation from base environment
-            # Need to convert it using _convert_obs first
-            converted_obs = self._convert_obs(obs_dict)
-            agent_obs = converted_obs[agent_id]
+        # Calculate progress as distance between current and previous waypoint
+        dist = np.linalg.norm(self._current_waypoints[i] - self.prev_waypoints[i])
 
-        obs_i = self._observation(i, agent_obs)
-        self.prev_waypoints[i] = pt
+        # Collision penalty scaled by velocity (matching original implementation)
+        collision_penalty = 0.0
+        if self.env.collisions[i] > 0:
+            velocity_squared = np.dot(self.prev_vels[i], self.prev_vels[i])
+            collision_penalty = -0.05 * velocity_squared
 
-        if action_dict is not None:
-            # Called from step
-            if hasattr(self.env, 'sim') and hasattr(self.env.sim, 'agents') and len(self.env.sim.agents) > i:
-                agent_state = self.env.sim.agents[i]
-                if hasattr(agent_state, 'standard_state'):
-                    std_state = agent_state.standard_state
-                    self.prev_vels[i] = np.array(
-                        [std_state.get("v_x", 0.0), std_state.get("v_y", 0.0)], dtype=np.float32)
-                    self.prev_yaw[i] = float(std_state.get("yaw", 0.0))
-                else:
-                    self.prev_vels[i] = np.zeros(2, dtype=np.float32)
-                    self.prev_yaw[i] = 0.0
+        # Update state for next step
+        self.prev_waypoints[i] = self._current_waypoints[i]
+        if hasattr(self.env, 'sim') and hasattr(self.env.sim, 'agents') and len(self.env.sim.agents) > i:
+            agent_state = self.env.sim.agents[i]
+            if hasattr(agent_state, 'standard_state'):
+                std_state = agent_state.standard_state
+                self.prev_vels[i] = np.array(
+                    [std_state.get("v_x", 0.0), std_state.get("v_y", 0.0)], dtype=np.float32)
+                self.prev_yaw[i] = float(std_state.get("yaw", 0.0))
             else:
                 self.prev_vels[i] = np.zeros(2, dtype=np.float32)
                 self.prev_yaw[i] = 0.0
-            self.prev_steer_angle[i] = float(action_dict[agent_id][1])
         else:
-            # Called from reset
             self.prev_vels[i] = np.zeros(2, dtype=np.float32)
-            self.prev_steer_angle[i] = 0.0
             self.prev_yaw[i] = 0.0
 
-        return obs_i
+        reward = dist + collision_penalty
 
-    def step(self, action_dict: dict):
-        # Call parent step to get base multi-agent observations
-        obs_dict, rew_dict, terminated_dict, truncated_dict, info_dict = super().step(action_dict)
+        # Validate reward
+        if not np.isfinite(reward):
+            print(f"[WARN] Agent {i} invalid reward dist={dist}, pen={collision_penalty}")
+            reward = -1.0
 
-        # Convert base observations to our custom observations
-        custom_obs_dict = {}
-        custom_rew_dict = {}
+        return float(reward)
 
-        for agent_id in obs_dict.keys():
-            if agent_id != "__all__":  # Skip special keys
-                agent_idx = int(agent_id.split("_")[1])  # Extract index from "agent_0", "agent_1", etc.
-
-                # Update agent state and get custom observation
-                custom_obs = self._update_agent_state_and_obs(agent_idx, obs_dict, action_dict)
-                custom_obs_dict[agent_id] = custom_obs
-
-                # Calculate custom reward
-                newly_crashed = set()
-                if self.env.collisions[agent_idx] and agent_id not in self._crashed_agents:
-                    newly_crashed.add(agent_id)
-                    self._crashed_agents.add(agent_id)
-
-                custom_reward = self._compute_reward(agent_id, newly_crashed, agent_idx)
-                custom_rew_dict[agent_id] = custom_reward
-
-        return custom_obs_dict, custom_rew_dict, terminated_dict, truncated_dict, info_dict
-
-    def reset(self, **kwargs):
-        original_obs, info = super().reset(**kwargs)
-
-        # Reset crashed agents set
-        self._crashed_agents = set()
-
-        # Convert to custom observations for each agent
-        custom_obs_dict = {}
-        for i in range(self.env.num_agents):
-            agent_id = self.agents[i]
-            custom_obs = self._update_agent_state_and_obs(i, original_obs, None)
-            custom_obs_dict[agent_id] = custom_obs
-
-        return custom_obs_dict, info
+    def calc_current_waypoint(self, idx: int):
+        """Calculate current waypoint for agent idx."""
+        pos = np.array([self.env.poses_x[idx], self.env.poses_y[idx]], dtype=self._waypoints.dtype)
+        pt, _, _, index = nearest_point_on_trajectory(point=pos, trajectory=self._waypoints)
+        return pt, int(index)
