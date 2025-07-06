@@ -156,12 +156,12 @@ def run_training(config):
 
     # Setup search algorithm for hyperparameter tuning
     tune_kwargs = {}
-    
+
     # Validate hyperparameter configuration
     validate_hyperparameter_config(config)
-    
+
     hyperparameter_tuning = config.get("hyperparameter_tuning", False)
-    
+
     if hyperparameter_tuning:
         default_metric = "env_runners/episode_reward_mean"
         search_alg = OptunaSearch(metric=default_metric, mode="max", seed=SEED)
@@ -261,7 +261,7 @@ def run_evaluation(config, trial_name=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        prog=Path(__file__).stem, 
+        prog=Path(__file__).stem,
         description='Run F1TENTH multi-agent training or evaluation.',
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
@@ -273,13 +273,13 @@ if __name__ == '__main__':
         """
     )
     parser.add_argument(
-        '--config', type=Path, default=Path('configs/experiments.yaml'), 
+        '--config', type=Path, default=Path('configs/experiments.yaml'),
         help='Path to the experiments configuration file (default: configs/experiments.yaml)')
 
     subparsers = parser.add_subparsers(
-        title='Commands', 
-        dest='command', 
-        required=True, 
+        title='Commands',
+        dest='command',
+        required=True,
         help='Available commands:',
         description='Choose one of the following commands:'
     )
@@ -293,7 +293,8 @@ if __name__ == '__main__':
     # Eval parser
     eval_parser = subparsers.add_parser('eval', help='Evaluate a trained model')
     eval_parser.add_argument('--experiment', type=str, required=True, help='Name of the experiment to evaluate')
-    eval_parser.add_argument('--trial', type=str, default=None, help='Specific trial to evaluate (optional, uses best trial if not specified)')
+    eval_parser.add_argument('--trial', type=str, default=None,
+                             help='Specific trial to evaluate (optional, uses best trial if not specified)')
 
     if len(sys.argv) == 1:  # Si no se pasan argumentos
         parser.print_help()  # Mostrar el mensaje de ayuda
