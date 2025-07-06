@@ -1,10 +1,75 @@
-experiment_name: f1tenth_multiagent_hyper_tuning
-reward_function: ProgressRewardEnv
-total_timesteps: 20000
-evaluation_interval: 10
-evaluation_episodes: 5
-ppo_config: ppo.yaml
-sac_config: sac.yaml
-hyperparameters:
-  lr: [0.001, 0.0005, 0.0001]
-  train_batch_size: [128, 256, 512]
+# Example hyperparameter tuning configuration
+# This file demonstrates different ways to use Ray Tune functions in YAML
+
+# ——— Anchors definitions ———
+training: &training
+  timesteps_total: 200_000
+  eval_interval:    1000
+  reward_function:  ProgressRewardEnv
+
+evaluation: &evaluation
+  episodes: 3
+
+env: &env
+  map:               oval_small
+  num_agents:        2
+  timestep:          0.01
+  num_beams:         36
+  integrator:        rk4
+  control_input:     [speed, steering_angle]
+  observation_config: { type: original }
+  reset_config:       { type: cl_grid_static }
+  render_mode:        null
+
+# PPO hyperparameters with different tune functions
+ppo_params: &ppo_params
+  gamma:            tune.loguniform(0.95, 0.999)     # Log-uniform distribution
+  lr:               tune.uniform(1e-5, 1e-3)         # Uniform distribution
+  clip_param:       tune.choice([0.1, 0.2, 0.3])     # Discrete choice
+  train_batch_size: tune.choice([2000, 4000, 8000])  # Different batch sizes
+  num_sgd_iter:     tune.randint(5, 20)              # Random integer
+  vf_clip_param:    tune.uniform(0.1, 1.0)           # Value function clipping
+  train_batch_size: 2000  # Different batch sizes
+  environment:      { normalize_actions: true }
+
+# SAC hyperparameters with tuning
+sac_params: &sac_params
+  tau:                   tune.loguniform(0.001, 0.01)
+  target_entropy:        auto
+  alpha_lr:              tune.loguniform(1e-5, 1e-3)
+  q_lr:                  tune.loguniform(1e-5, 1e-3)
+  policy_lr:             tune.loguniform(1e-5, 1e-3)
+  environment:           { normalize_actions: true }
+  replay_buffer_config:  { type: MultiAgentPrioritizedReplayBuffer }
+
+# ——— List of experiments ———
+experiments:
+  - name: oval_small_PPO_Hyperparameter_Tuning
+    storage_path: ../models_testing
+    hyperparameter_tuning: true
+    num_samples: 50  # Number of trials for hyperparameter tuning
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: true
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+    ppo_params:
+      <<: *ppo_params
+
+  # - name: oval_small_SAC_Hyperparameter_Tuning
+  #   storage_path: ../models_testing
+  #   hyperparameter_tuning: true
+  #   num_samples: 50  # Number of trials for hyperparameter tuning
+  #   training:
+  #     <<: *training
+  #     algorithm:     SAC
+  #     shared_policy: true
+  #   evaluation:
+  #     <<: *evaluation
+  #   env:
+  #     <<: *env
+  #   sac_params:
+  #     <<: *sac_params
