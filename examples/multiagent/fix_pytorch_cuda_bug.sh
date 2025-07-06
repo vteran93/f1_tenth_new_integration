@@ -1,14 +1,14 @@
-# SOLUCIÓN DEFINITIVA: PyTorch CPU-only
-# Para resolver el bug de memory corruption con CUDA
+# DEFINITIVE SOLUTION: PyTorch CPU-only
+# To resolve the memory corruption bug with CUDA
 
-# Desinstalar PyTorch con CUDA
+# Uninstall PyTorch with CUDA
 pip uninstall torch torchvision torchaudio -y
 
-# Instalar PyTorch CPU-only (versión estable)
+# Install PyTorch CPU-only (stable version)
 pip install torch==2.7.1+cpu torchvision==0.18.1+cpu torchaudio==2.7.1+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
 
-# O alternativamente (método más simple):
+# Or alternatively (simpler method):
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
-echo "✅ PyTorch CPU-only instalado"
-echo "🔄 Reiniciar entorno virtual después de la instalación"
+echo "✅ PyTorch CPU-only installed"
+echo "🔄 Restart virtual environment

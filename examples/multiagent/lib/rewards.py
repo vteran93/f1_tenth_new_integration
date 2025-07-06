@@ -207,8 +207,9 @@ class SpeedReward(MultiAgentF110):
 
 
 class WaypointReward(MultiAgentF110):
-    """Waypoint-based reward encouraging structured track progression.
-        This reward was adapted from https://github.com/BDEvan5/f1tenth_benchmarks/ ???
+    """
+    Waypoint-based reward encouraging structured track progression.
+    This reward was adapted from https://github.com/BDEvan5/f1tenth_benchmarks/ ??? PEPE
     """
 
     def __init__(self, env_config=None):

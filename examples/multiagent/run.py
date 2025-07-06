@@ -172,6 +172,11 @@ def run_training(config):
         tune_kwargs["num_samples"] = 1
         logger.info("Hyperparameter tuning disabled. Using num_samples=1 for single trial run.")
 
+    # TODO, should we assign tune.run to a variable? like: results = tune.run(...)
+    # So potentially we can access the results later or write them to a file, for ex.
+    # best_trial = results.get_best_trial("env_runners/episode_return_mean", "max")
+    # best_checkpoint_path = results.get_best_checkpoint(best_trial, "env_runners/episode_return_mean", "max")
+    
     tune.run(
         algorithm_name,
         config=config_algo.to_dict(),
