@@ -3,18 +3,18 @@ Unit tests for reward functions consolidation.
 Tests the 5 consolidated reward classes to ensure proper functionality.
 """
 
-from rewards_pepe import (
+from examples.multiagent.lib.rewards import (
     ProgressRewardAdvancedEnv,
     SpeedReward,
     WaypointReward,
     CompetitiveOvertakingReward,
     SafetyReward,
-    RewardFunction
+
 )
-from rewards import ProgressRewardEnv, BaseReward
+from examples.multiagent.lib.rewards import ProgressRewardEnv, BaseReward
 import unittest
 import numpy as np
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
 import sys
 import os
 
@@ -98,7 +98,7 @@ class TestProgressRewardAdvancedEnv(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.env_config = {"num_agents": 2}
-        with patch('rewards_pepe.MultiAgentF110'):
+        with patch('rewards.MultiAgentF110'):
             self.reward_env = ProgressRewardAdvancedEnv(self.env_config)
 
         # Mock the environment
@@ -137,7 +137,7 @@ class TestSpeedReward(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.env_config = {"num_agents": 2, "timestep": 0.01}
-        with patch('rewards_pepe.MultiAgentF110'):
+        with patch('rewards.MultiAgentF110'):
             self.reward_env = SpeedReward(self.env_config)
 
         # Mock the environment
@@ -175,7 +175,7 @@ class TestWaypointReward(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.env_config = {"num_agents": 2}
-        with patch('rewards_pepe.MultiAgentF110'):
+        with patch('rewards.MultiAgentF110'):
             self.reward_env = WaypointReward(self.env_config)
 
         # Mock the environment
@@ -215,7 +215,7 @@ class TestCompetitiveOvertakingReward(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.env_config = {"num_agents": 3, "timestep": 0.01}
-        with patch('rewards_pepe.MultiAgentF110'):
+        with patch('rewards.MultiAgentF110'):
             self.reward_env = CompetitiveOvertakingReward(self.env_config)
 
         # Mock the environment
@@ -272,7 +272,7 @@ class TestSafetyReward(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.env_config = {"num_agents": 2}
-        with patch('rewards_pepe.MultiAgentF110'):
+        with patch('rewards.MultiAgentF110'):
             self.reward_env = SafetyReward(self.env_config)
 
         # Mock the environment
@@ -317,10 +317,10 @@ class TestSafetyReward(unittest.TestCase):
 class TestRewardFactoryFunction(unittest.TestCase):
     """Test the reward factory function."""
 
-    @patch('rewards_pepe.MultiAgentF110')
+    @patch('rewards.MultiAgentF110')
     def test_factory_function_creation(self):
         """Test that factory function creates correct reward instances."""
-        from rewards_pepe import get_reward_function
+        from examples.multiagent.lib.rewards import get_reward_function
 
         # Test each reward type
         test_cases = [
@@ -339,7 +339,7 @@ class TestRewardFactoryFunction(unittest.TestCase):
 
     def test_factory_function_invalid_name(self):
         """Test factory function with invalid reward name."""
-        from rewards_pepe import get_reward_function
+        from examples.multiagent.lib.rewards import get_reward_function
 
         with self.assertRaises(ValueError):
             get_reward_function("InvalidRewardName", Mock())

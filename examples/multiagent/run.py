@@ -279,6 +279,7 @@ if __name__ == '__main__':
                 run_training(cfg)
             except Exception as e:
                 logger.error(f"Error during training of {cfg['name']}: {e}")
+                raise e
                 continue
             # This way we can catch errors in training and continue with the next experiment
 
