@@ -102,7 +102,7 @@ experiments:
     sac_params:
       <<: *sac_params
 
-  - name: oval_small_SAC_Kohonda_Individual_Policies
+  - name: oval_small_SAC_Kohonda_Individual_Policy
     storage_path: ../models
     training:
       <<: *training

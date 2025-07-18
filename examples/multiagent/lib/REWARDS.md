@@ -7,7 +7,7 @@
 | **SpeedRewardEnv**           | Velocidad y movimiento constante       | Penaliza colisión fuertemente    | Media       | Media           | Agentes que deben ir rápido             | Usa la mayor de dos velocidades, bonus por alta velocidad|
 | **WaypointRewardEnv**        | Progreso estructurado y precisión      | Penaliza colisión y desviación   | Media       | Alta            | Aprendizaje de trayectorias             | Penaliza alejarse del centro, bonus por vueltas         |
 | **SafetyRewardEnv**          | Seguridad y evitar obstáculos          | Penaliza colisión fuertemente    | Media       | Media           | Entornos peligrosos o estrechos         | Usa LiDAR para premiar distancia a obstáculos           |
-| **KohondaMultiAgentF110Env** | Progreso basado en raceline            | Penaliza colisión fijo o escalado| Media       | Media           | Seguimiento de trayectoria óptima       | Usa raceline en lugar de centerline, progreso por distancia entre waypoints |
+| **KohondaMultiAgentF110Env** | Progreso basado en raceline            | Penaliza colisión fijo o escalado| Media       | Media           | Seguimiento de trayectoria óptima       | Usa raceline en lugar de centerlPine, progreso por distancia entre waypoints |
 
 ---
 

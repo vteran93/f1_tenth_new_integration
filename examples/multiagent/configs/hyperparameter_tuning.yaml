@@ -36,16 +36,21 @@ ppo_params: &ppo_params
 sac_params: &sac_params
   tau:                   tune.loguniform(0.001, 0.01)
   target_entropy:        auto
+  initial_alpha:         tune.loguniform(0.1, 1.0)
   alpha_lr:              tune.loguniform(1e-5, 1e-3)
-  q_lr:                  tune.loguniform(1e-5, 1e-3)
-  policy_lr:             tune.loguniform(1e-5, 1e-3)
+  actor_lr:              tune.loguniform(1e-5, 1e-3)
+  critic_lr:             tune.loguniform(1e-5, 1e-3)
+  training_intensity:    tune.uniform(1.0, 10.0)
+  target_network_update_freq: tune.randint(1, 5)
+  n_step:                tune.randint(1, 5)
+  twin_q:                true
   environment:           { normalize_actions: true }
   replay_buffer_config:  { type: MultiAgentPrioritizedReplayBuffer }
 
 # ——— List of experiments ———
 experiments:
   - name: oval_small_PPO_Hyperparameter_Tuning
-    storage_path: ../models_testing
+    storage_path: ../models_hypertunning
     hyperparameter_tuning: true
     num_samples: 50  # Number of trials for hyperparameter tuning
     training:
@@ -58,6 +63,23 @@ experiments:
       <<: *env
     ppo_params:
       <<: *ppo_params
+
+  - name: oval_small_SAC_Kohonda_Individual_Policy
+    storage_path: ../models_hyper_tunning
+    hyperparameter_tuning: true
+    num_samples: 10  # Number of trials for hyperparameter tuning
+    training:
+      <<: *training
+      reward_function:  KohondaMultiAgentF110Env
+      algorithm:     SAC
+      shared_policy: false
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      num_agents: 2
+    sac_params:
+      <<: *sac_params
 
   # - name: oval_small_SAC_Hyperparameter_Tuning
   #   storage_path: ../models_testing
