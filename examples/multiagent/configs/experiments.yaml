@@ -3,7 +3,7 @@
 # This are the anchors used to avoid repetition in the YAML file.
 # Anchors are used to define common configurations that can be reused across different experiments.
 training: &training
-  timesteps_total: 3_000_000
+  timesteps_total: 2_000_000
   eval_interval:    2000
   reward_function:  ProgressRewardEnv
 
@@ -21,234 +21,151 @@ env: &env
   reset_config:       { type: cl_grid_static }
   render_mode:        null
 
+# https://arxiv.org/html/2403.07129v1#S4.E10
 ppo_params: &ppo_params
-  gamma:            0.99
-  lr:               0.00005
-  train_batch_size: 4000
-  environment:      { normalize_actions: true }
+  # Basic hyperparameters
+  gamma:                        0.99
+  lr:                          0.0001
+  
+  # Learning rate schedule
+  lr_schedule:                 [[0, 0.0001], [30000000, 0.0]]  # Cosine schedule approximation
+  
+  # Batch and trajectory configuration
+  train_batch_size:            512
+  # rollout_fragment_length:     2048
+  
+  # Policy optimization
+  clip_param:                  0.1
+  num_sgd_iter:                7
+  minibatch_size:              512
+  
+  # Value function
+  vf_loss_coeff:               0.5
+  
+  # GAE and advantage estimation
+  use_gae:                     true
+  lambda_:                     0.95
+  
+  # Gradient clipping
+  grad_clip:                   1.0
+  
+  # Neural network initialization
+  model:
+    fcnet_hiddens:             [256, 256]
+    fcnet_weights_initializer: "truncated_normal"
+    fcnet_weights_initializer_config: {"std": 0.7}
+  
+  # Environment configuration
+  environment:                 { normalize_actions: true }
 
+# https://proceedings.neurips.cc/paper_files/paper/2024/file/b91ea2ba1b6521940e204b7b81d5ef47-Paper-Datasets_and_Benchmarks_Track.pdf#:~:text=Checkpoint%20frequency%20200%2C000%20Discount%20factor,Target%20update%20coefficient%200.005
 sac_params: &sac_params
-  tau:                   0.005
-  target_entropy:        auto
-  alpha_lr:              0.0003
-  environment:           { normalize_actions: true }
-  replay_buffer_config:  { type: MultiAgentPrioritizedReplayBuffer }
+  # Basic hyperparameters
+  gamma:                         0.992
+  lr:                           0.0003
+  # policy_lr:                    0.0003
+  # q_lr:                         0.0003
+  # alpha_lr:                     0.0003
+  
+  # Batch and buffer configuration
+  train_batch_size:             128
+  
+  # Update configuration
+  training_intensity:           1
+  
+  # N-step learning
+  n_step:                       3
+  
+  # Target network update
+  tau:                          0.005
+  
+  # Q-function configuration
+  twin_q:                       true
+  
+  # Neural network architecture
+  model:
+    fcnet_hiddens:              [256, 256, 256]
+  q_model_config:
+    fcnet_hiddens:              [256, 256, 256]
+  policy_model_config:
+    fcnet_hiddens:              [256, 256, 256]
+  
+  # Misc
+  target_entropy:               auto
+  environment:                  { normalize_actions: true }
+  replay_buffer_config:         { type: MultiAgentPrioritizedReplayBuffer, capacity: 10000000 }
 
 # ——— List of experiments ———
 experiments:
-  - name: oval_small_PPO_Shared_Policy
-    storage_path: ../models
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: true
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-    ppo_params:
-      <<: *ppo_params
-
-  - name: oval_small_PPO_Individual_Policies
-    storage_path: ../models
+  # PPO experiments with oval_small
+  - name: oval_small_PPO_Individual_Policy_ProgressRewardAdvanced
+    storage_path: ../models_deposito
     training:
       <<: *training
       algorithm:     PPO
       shared_policy: false
+      reward_function: ProgressRewardAdvancedEnv
     evaluation:
       <<: *evaluation
     env:
       <<: *env
+      map: oval_small
     ppo_params:
       <<: *ppo_params
 
-  - name: oval_small_SAC_Shared_Policy
-    storage_path: ../models
-    training:
-      <<: *training
-      algorithm:     SAC
-      shared_policy: true
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-    sac_params:
-      <<: *sac_params
-
-  - name: oval_small_SAC_Individual_Policy
-    storage_path: ../models
-    training:
-      <<: *training
-      algorithm:     SAC
-      shared_policy: falseº
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-    sac_params:
-      <<: *sac_params
-
-  - name: oval_small_SAC_Kohonda_Shared_Policy
-    storage_path: ../models
-    training:
-      <<: *training
-      algorithm:     SAC
-      reward_function:  KohondaMultiAgentF110Env
-      shared_policy: true
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-    sac_params:
-      <<: *sac_params
-
-  - name: oval_small_SAC_Kohonda_Individual_Policies
-    storage_path: ../models
-    training:
-      <<: *training
-      reward_function:  KohondaMultiAgentF110Env
-      algorithm:     SAC
-      shared_policy: false
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-    sac_params:
-      <<: *sac_params
-
-  - name: oval_small_SAC_Shared_Policy
-    storage_path: ../models
-    training:
-      <<: *training
-      algorithm:     SAC
-      shared_policy: true
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-    sac_params:
-      <<: *sac_params
-
-  
-  
-  - name: Spielberg_PPO_Shared_Policy
-    storage_path: ../models
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: true
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Spielberg
-    ppo_params:
-      <<: *ppo_params
-
-  - name: Spielberg_PPO_Individual_Policies
-    storage_path: ../models
+  - name: oval_small_PPO_Individual_Policy_SpeedReward
+    storage_path: ../models_deposito
     training:
       <<: *training
       algorithm:     PPO
       shared_policy: false
+      reward_function: SpeedRewardEnv
     evaluation:
       <<: *evaluation
     env:
       <<: *env
-      map: Spielberg
+      map: oval_small
     ppo_params:
       <<: *ppo_params
 
-  - name: Spielberg_SAC_Shared_Policy
-    storage_path: ../models
-    training:
-      <<: *training
-      algorithm:     SAC
-      shared_policy: true
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Spielberg
-    sac_params:
-      <<: *sac_params
-
-  - name: Spielberg_SAC_Individual_Policies
-    storage_path: ../models
-    training:
-      <<: *training
-      algorithm:     SAC
-      shared_policy: false
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Spielberg
-    sac_params:
-      <<: *sac_params
-
-  - name: Monza_PPO_Shared_Policy_Convergence
-    storage_path: ../models
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: true
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Monza
-    ppo_params:
-      <<: *ppo_params
-
-  - name: Monza_PPO_Individual_Policies_Convergence
-    storage_path: ../models
+  - name: oval_small_PPO_Individual_Policy_WaypointReward
+    storage_path: ../models_deposito
     training:
       <<: *training
       algorithm:     PPO
       shared_policy: false
+      reward_function: WaypointRewardEnv
     evaluation:
       <<: *evaluation
     env:
       <<: *env
-      map: Monza
+      map: oval_small
     ppo_params:
       <<: *ppo_params
-  
-  - name: Monza_SAC_Shared_Policy_Convergence
-    storage_path: ../models
-    training:
-      <<: *training
-      algorithm:     SAC
-      shared_policy: true
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Monza
-    sac_params:
-      <<: *sac_params
 
-  - name: Monza_SAC_Individual_Policies_Convergence
-    storage_path: ../models
-    training:
-      <<: *training
-      algorithm:     SAC
-      shared_policy: false
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Monza
-    sac_params:
-      <<: *sac_params
-
-  - name: Catalunya_PPO_Shared_Policy_Convergence
-    storage_path: ../models
+  - name: oval_small_PPO_Individual_Policy_SafetyReward
+    storage_path: ../models_deposito
     training:
       <<: *training
       algorithm:     PPO
-      shared_policy: true
+      shared_policy: false
+      reward_function: SafetyRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: oval_small
+    ppo_params:
+      <<: *ppo_params
+
+  # PPO experiments with Catalunya
+  - name: Catalunya_PPO_Individual_Policy_ProgressRewardAdvanced
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: ProgressRewardAdvancedEnv
     evaluation:
       <<: *evaluation
     env:
@@ -257,12 +174,13 @@ experiments:
     ppo_params:
       <<: *ppo_params
 
-  - name: Catalunya_PPO_Individual_Policies_Convergence
-    storage_path: ../models
+  - name: Catalunya_PPO_Individual_Policy_SpeedReward
+    storage_path: ../models_deposito
     training:
       <<: *training
       algorithm:     PPO
       shared_policy: false
+      reward_function: SpeedRewardEnv
     evaluation:
       <<: *evaluation
     env:
@@ -270,13 +188,228 @@ experiments:
       map: Catalunya
     ppo_params:
       <<: *ppo_params
-  
-  - name: Catalunya_SAC_Shared_Policy_Convergence
-    storage_path: ../models
+
+  - name: Catalunya_PPO_Individual_Policy_WaypointReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: WaypointRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Catalunya
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Catalunya_PPO_Individual_Policy_SafetyReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: SafetyRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Catalunya
+    ppo_params:
+      <<: *ppo_params
+
+  # PPO experiments with Spielberg
+  - name: Spielberg_PPO_Individual_Policy_ProgressRewardAdvanced
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: ProgressRewardAdvancedEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Spielberg_PPO_Individual_Policy_SpeedReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: SpeedRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Spielberg_PPO_Individual_Policy_WaypointReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: WaypointRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Spielberg_PPO_Individual_Policy_SafetyReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: SafetyRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    ppo_params:
+      <<: *ppo_params
+
+  # PPO experiments with Monza
+  - name: Monza_PPO_Individual_Policy_ProgressRewardAdvanced
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: ProgressRewardAdvancedEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Monza_PPO_Individual_Policy_SpeedReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: SpeedRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Monza_PPO_Individual_Policy_WaypointReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: WaypointRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Monza_PPO_Individual_Policy_SafetyReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: SafetyRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    ppo_params:
+      <<: *ppo_params
+
+  # SAC experiments with oval_small
+  - name: oval_small_SAC_Individual_Policy_ProgressRewardAdvanced
+    storage_path: ../models_deposito
     training:
       <<: *training
       algorithm:     SAC
-      shared_policy: true
+      shared_policy: false
+      reward_function: ProgressRewardAdvancedEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: oval_small
+    sac_params:
+      <<: *sac_params
+
+  - name: oval_small_SAC_Individual_Policy_SpeedReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+      reward_function: SpeedRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: oval_small
+    sac_params:
+      <<: *sac_params
+
+  - name: oval_small_SAC_Individual_Policy_WaypointReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+      reward_function: WaypointRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: oval_small
+    sac_params:
+      <<: *sac_params
+
+  - name: oval_small_SAC_Individual_Policy_SafetyReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+      reward_function: SafetyRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: oval_small
+    sac_params:
+      <<: *sac_params
+
+  # SAC experiments with Catalunya
+  - name: Catalunya_SAC_Individual_Policy_ProgressRewardAdvanced
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+      reward_function: ProgressRewardAdvancedEnv
     evaluation:
       <<: *evaluation
     env:
@@ -285,12 +418,13 @@ experiments:
     sac_params:
       <<: *sac_params
 
-  - name: Catalunya_SAC_Individual_Policies_Convergence
-    storage_path: ../models
+  - name: Catalunya_SAC_Individual_Policy_SpeedReward
+    storage_path: ../models_deposito
     training:
       <<: *training
       algorithm:     SAC
       shared_policy: false
+      reward_function: SpeedRewardEnv
     evaluation:
       <<: *evaluation
     env:
@@ -299,58 +433,154 @@ experiments:
     sac_params:
       <<: *sac_params
 
-  - name: Silverstone_PPO_Shared_Policy_Convergence
-    storage_path: ../models
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: true
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Silverstone
-    ppo_params:
-      <<: *ppo_params
-
-  - name: Silverstone_PPO_Individual_Policies_Convergence
-    storage_path: ../models
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: false
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Silverstone
-    ppo_params:
-      <<: *ppo_params
-  
-  - name: Silverstone_SAC_Shared_Policy_Convergence
-    storage_path: ../models
+  - name: Catalunya_SAC_Individual_Policy_WaypointReward
+    storage_path: ../models_deposito
     training:
       <<: *training
       algorithm:     SAC
-      shared_policy: true
+      shared_policy: false
+      reward_function: WaypointRewardEnv
     evaluation:
       <<: *evaluation
     env:
       <<: *env
-      map: Silverstone
+      map: Catalunya
     sac_params:
       <<: *sac_params
 
-  - name: Silverstone_SAC_Individual_Policies_Convergence
-    storage_path: ../models
+  - name: Catalunya_SAC_Individual_Policy_SafetyReward
+    storage_path: ../models_deposito
     training:
       <<: *training
       algorithm:     SAC
       shared_policy: false
+      reward_function: SafetyRewardEnv
     evaluation:
       <<: *evaluation
     env:
       <<: *env
-      map: Silverstone
+      map: Catalunya
+    sac_params:
+      <<: *sac_params
+
+  # SAC experiments with Spielberg
+  - name: Spielberg_SAC_Individual_Policy_ProgressRewardAdvanced
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+      reward_function: ProgressRewardAdvancedEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    sac_params:
+      <<: *sac_params
+
+  - name: Spielberg_SAC_Individual_Policy_SpeedReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+      reward_function: SpeedRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    sac_params:
+      <<: *sac_params
+
+  - name: Spielberg_SAC_Individual_Policy_WaypointReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+      reward_function: WaypointRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    sac_params:
+      <<: *sac_params
+
+  - name: Spielberg_SAC_Individual_Policy_SafetyReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+      reward_function: SafetyRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    sac_params:
+      <<: *sac_params
+
+  # SAC experiments with Monza
+  - name: Monza_SAC_Individual_Policy_ProgressRewardAdvanced
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+      reward_function: ProgressRewardAdvancedEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    sac_params:
+      <<: *sac_params
+
+  - name: Monza_SAC_Individual_Policy_SpeedReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+      reward_function: SpeedRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    sac_params:
+      <<: *sac_params
+
+  - name: Monza_SAC_Individual_Policy_WaypointReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+      reward_function: WaypointRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    sac_params:
+      <<: *sac_params
+
+  - name: Monza_SAC_Individual_Policy_SafetyReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     SAC
+      shared_policy: false
+      reward_function: SafetyRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
     sac_params:
       <<: *sac_params
