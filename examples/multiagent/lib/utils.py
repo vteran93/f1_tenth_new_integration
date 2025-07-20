@@ -64,8 +64,8 @@ def load_config(path):
         return yaml.load(f, Loader=TuneLoader)
 
 
-def init_ray(local_mode=False):
-    ray.init(local_mode=local_mode, ignore_reinit_error=True,  num_cpus=16,                   # fuerza a Ray a usar 16 hilos
+def init_ray(local_mode=False, num_cpus=16):
+    ray.init(local_mode=local_mode, ignore_reinit_error=True, num_cpus=num_cpus,
              num_gpus=0)
 
 

@@ -49,7 +49,7 @@ class TimestepsStopper(Stopper):
         return False
 
 
-def get_algorithm_config(config, env_config, policies, policy_mapping_fn):
+def get_algorithm_config(config, env_config, policies, policy_mapping_fn, num_env_runners=8, num_envs_per_env_runner=2):
     algorithm_name = config['training']['algorithm']
 
     if algorithm_name not in ALGO_MAP:
@@ -84,8 +84,8 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn):
             evaluation_config={"seed": SEED},
         )
         .env_runners(
-            num_env_runners=8,             # Number of parallel processes (<= CPUs)
-            num_envs_per_env_runner=2,     # Vectorized environments per process
+            num_env_runners=num_env_runners,             # Number of parallel processes (<= CPUs)
+            num_envs_per_env_runner=num_envs_per_env_runner,     # Vectorized environments per process
             gym_env_vectorize_mode="ASYNC"
         )
         .debugging(seed=SEED)
@@ -132,7 +132,13 @@ def run_training(config):
     temp_env.close()
 
     algorithm_name = config['training']['algorithm']
-    config_algo = get_algorithm_config(config, env_config, policies, policy_mapping_fn)
+    
+    # Get env_runners configuration from global config
+    num_env_runners = config.get('num_env_runners', 8)
+    num_envs_per_env_runner = config.get('num_envs_per_env_runner', 2)
+    
+    config_algo = get_algorithm_config(config, env_config, policies, policy_mapping_fn, 
+                                     num_env_runners, num_envs_per_env_runner)
 
     # Define plateau stopper for convergence
     plateau_stopper = TrialPlateauStopper(
@@ -312,7 +318,13 @@ if __name__ == '__main__':
     config_data = load_config(config_path)
     experiments = config_data.get('experiments', [])
 
-    init_ray()
+    # Get num_cpus from config, default to 16 if not specified
+    num_cpus = config_data.get('num_cpus', 16)
+    # Get env_runners configuration from global config
+    global_num_env_runners = config_data.get('num_env_runners', 8)
+    global_num_envs_per_env_runner = config_data.get('num_envs_per_env_runner', 2)
+    
+    init_ray(num_cpus=num_cpus)
 
     if args.command == 'train':
         if args.all:
@@ -322,6 +334,9 @@ if __name__ == '__main__':
 
         for experiment in experiments_to_run:
             cfg = setup_experiment_config(experiment, config_dir)
+            # Add global env_runners config to each experiment
+            cfg['num_env_runners'] = global_num_env_runners
+            cfg['num_envs_per_env_runner'] = global_num_envs_per_env_runner
             logger.info(f"Training: {cfg['name']}")
             try:
                 run_training(cfg)
@@ -334,5 +349,8 @@ if __name__ == '__main__':
     elif args.command == 'eval':
         experiment = find_experiment(experiments, args.experiment)
         cfg = setup_experiment_config(experiment, config_dir)
+        # Add global env_runners config (not needed for eval but for consistency)
+        cfg['num_env_runners'] = global_num_env_runners
+        cfg['num_envs_per_env_runner'] = global_num_envs_per_env_runner
         logger.info(f"Evaluating: {cfg['name']}" + (f" (trial={args.trial})" if args.trial else ""))
         run_evaluation(cfg, args.trial)

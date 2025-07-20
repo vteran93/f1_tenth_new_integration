@@ -2,6 +2,12 @@
 # This file defines the configuration for multiple experiments in a multi-agent reinforcement learning setup.
 # This are the anchors used to avoid repetition in the YAML file.
 # Anchors are used to define common configurations that can be reused across different experiments.
+
+# Global configuration
+num_cpus: 16  # Number of CPUs for Ray to use
+num_env_runners: 8  # Number of parallel processes (<= CPUs)
+num_envs_per_env_runner: 2  # Vectorized environments per process
+
 training: &training
   timesteps_total: 2_000_000
   eval_interval:    2000
@@ -97,6 +103,7 @@ sac_params: &sac_params
 
 # ——— List of experiments ———
 experiments:
+  # ——— oval_small experiments ———
   # PPO experiments with oval_small
   - name: oval_small_PPO_Individual_Policy_ProgressRewardAdvanced
     storage_path: ../models_deposito
@@ -155,189 +162,6 @@ experiments:
     env:
       <<: *env
       map: oval_small
-    ppo_params:
-      <<: *ppo_params
-
-  # PPO experiments with Catalunya
-  - name: Catalunya_PPO_Individual_Policy_ProgressRewardAdvanced
-    storage_path: ../models_deposito
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: false
-      reward_function: ProgressRewardAdvancedEnv
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Catalunya
-    ppo_params:
-      <<: *ppo_params
-
-  - name: Catalunya_PPO_Individual_Policy_SpeedReward
-    storage_path: ../models_deposito
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: false
-      reward_function: SpeedRewardEnv
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Catalunya
-    ppo_params:
-      <<: *ppo_params
-
-  - name: Catalunya_PPO_Individual_Policy_WaypointReward
-    storage_path: ../models_deposito
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: false
-      reward_function: WaypointRewardEnv
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Catalunya
-    ppo_params:
-      <<: *ppo_params
-
-  - name: Catalunya_PPO_Individual_Policy_SafetyReward
-    storage_path: ../models_deposito
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: false
-      reward_function: SafetyRewardEnv
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Catalunya
-    ppo_params:
-      <<: *ppo_params
-
-  # PPO experiments with Spielberg
-  - name: Spielberg_PPO_Individual_Policy_ProgressRewardAdvanced
-    storage_path: ../models_deposito
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: false
-      reward_function: ProgressRewardAdvancedEnv
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Spielberg
-    ppo_params:
-      <<: *ppo_params
-
-  - name: Spielberg_PPO_Individual_Policy_SpeedReward
-    storage_path: ../models_deposito
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: false
-      reward_function: SpeedRewardEnv
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Spielberg
-    ppo_params:
-      <<: *ppo_params
-
-  - name: Spielberg_PPO_Individual_Policy_WaypointReward
-    storage_path: ../models_deposito
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: false
-      reward_function: WaypointRewardEnv
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Spielberg
-    ppo_params:
-      <<: *ppo_params
-
-  - name: Spielberg_PPO_Individual_Policy_SafetyReward
-    storage_path: ../models_deposito
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: false
-      reward_function: SafetyRewardEnv
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Spielberg
-    ppo_params:
-      <<: *ppo_params
-
-  # PPO experiments with Monza
-  - name: Monza_PPO_Individual_Policy_ProgressRewardAdvanced
-    storage_path: ../models_deposito
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: false
-      reward_function: ProgressRewardAdvancedEnv
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Monza
-    ppo_params:
-      <<: *ppo_params
-
-  - name: Monza_PPO_Individual_Policy_SpeedReward
-    storage_path: ../models_deposito
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: false
-      reward_function: SpeedRewardEnv
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Monza
-    ppo_params:
-      <<: *ppo_params
-
-  - name: Monza_PPO_Individual_Policy_WaypointReward
-    storage_path: ../models_deposito
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: false
-      reward_function: WaypointRewardEnv
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Monza
-    ppo_params:
-      <<: *ppo_params
-
-  - name: Monza_PPO_Individual_Policy_SafetyReward
-    storage_path: ../models_deposito
-    training:
-      <<: *training
-      algorithm:     PPO
-      shared_policy: false
-      reward_function: SafetyRewardEnv
-    evaluation:
-      <<: *evaluation
-    env:
-      <<: *env
-      map: Monza
     ppo_params:
       <<: *ppo_params
 
@@ -402,6 +226,68 @@ experiments:
     sac_params:
       <<: *sac_params
 
+  # ——— Catalunya experiments ———
+  # PPO experiments with Catalunya
+  - name: Catalunya_PPO_Individual_Policy_ProgressRewardAdvanced
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: ProgressRewardAdvancedEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Catalunya
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Catalunya_PPO_Individual_Policy_SpeedReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: SpeedRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Catalunya
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Catalunya_PPO_Individual_Policy_WaypointReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: WaypointRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Catalunya
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Catalunya_PPO_Individual_Policy_SafetyReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: SafetyRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Catalunya
+    ppo_params:
+      <<: *ppo_params
+
   # SAC experiments with Catalunya
   - name: Catalunya_SAC_Individual_Policy_ProgressRewardAdvanced
     storage_path: ../models_deposito
@@ -463,6 +349,68 @@ experiments:
     sac_params:
       <<: *sac_params
 
+  # ——— Spielberg experiments ———
+  # PPO experiments with Spielberg
+  - name: Spielberg_PPO_Individual_Policy_ProgressRewardAdvanced
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: ProgressRewardAdvancedEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Spielberg_PPO_Individual_Policy_SpeedReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: SpeedRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Spielberg_PPO_Individual_Policy_WaypointReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: WaypointRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Spielberg_PPO_Individual_Policy_SafetyReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: SafetyRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Spielberg
+    ppo_params:
+      <<: *ppo_params
+
   # SAC experiments with Spielberg
   - name: Spielberg_SAC_Individual_Policy_ProgressRewardAdvanced
     storage_path: ../models_deposito
@@ -523,6 +471,68 @@ experiments:
       map: Spielberg
     sac_params:
       <<: *sac_params
+
+  # ——— Monza experiments ———
+  # PPO experiments with Monza
+  - name: Monza_PPO_Individual_Policy_ProgressRewardAdvanced
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: ProgressRewardAdvancedEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Monza_PPO_Individual_Policy_SpeedReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: SpeedRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Monza_PPO_Individual_Policy_WaypointReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: WaypointRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    ppo_params:
+      <<: *ppo_params
+
+  - name: Monza_PPO_Individual_Policy_SafetyReward
+    storage_path: ../models_deposito
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: SafetyRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+      map: Monza
+    ppo_params:
+      <<: *ppo_params
 
   # SAC experiments with Monza
   - name: Monza_SAC_Individual_Policy_ProgressRewardAdvanced
