@@ -1,0 +1,124 @@
+# ——— Anchors definitions ———
+# This file defines the configuration for multiple experiments in a multi-agent reinforcement learning setup.
+# This are the anchors used to avoid repetition in the YAML file.
+# Anchors are used to define common configurations that can be reused across different experiments.
+training: &training
+  timesteps_total: 3_000_000
+  eval_interval:    2000
+  reward_function:  ProgressRewardEnv
+
+evaluation: &evaluation
+  episodes: 5
+
+env: &env
+  map:               oval_small
+  num_agents:        2
+  timestep:          0.01
+  num_beams:         36
+  integrator:        rk4
+  control_input:     [speed, steering_angle]
+  observation_config: { type: original }
+  reset_config:       { type: cl_grid_static }
+  render_mode:        null
+
+ppo_params: &ppo_params
+  gamma:            0.9902593709942341
+  lr:               0.0008152832829834001
+  clip_param:       0.3
+  train_batch_size: 2000
+  num_epochs:       18
+  vf_clip_param:    0.34689669673483714
+  environment:      { normalize_actions: true }
+
+sac_params: &sac_params
+  tau:                   0.005
+  target_entropy:        auto
+  alpha_lr:              0.0003
+  environment:           { normalize_actions: true }
+  replay_buffer_config:  { type: MultiAgentPrioritizedReplayBuffer }
+
+# ——— List of experiments ———
+experiments:
+  - name: oval_small_PPO_Individual_Policies_ProgressReward
+    storage_path: ../models_rewards
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: ProgressRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+    ppo_params:
+      <<: *ppo_params
+
+  - name: oval_small_PPO_Individual_Policies_ProgressRewardAdvanced
+    storage_path: ../models_rewards
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: ProgressRewardAdvancedEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+    ppo_params:
+      <<: *ppo_params
+
+  - name: oval_small_PPO_Individual_Policies_SpeedReward
+    storage_path: ../models_rewards
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: SpeedRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+    ppo_params:
+      <<: *ppo_params
+
+  - name: oval_small_PPO_Individual_Policies_WaypointReward
+    storage_path: ../models_rewards
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: WaypointRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+    ppo_params:
+      <<: *ppo_params
+
+  - name: oval_small_PPO_Individual_Policies_SafetyReward
+    storage_path: ../models_rewards
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: SafetyRewardEnv
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+    ppo_params:
+      <<: *ppo_params
+
+  - name: oval_small_PPO_Individual_Policies_KohondaMultiAgent
+    storage_path: ../models_rewards
+    training:
+      <<: *training
+      algorithm:     PPO
+      shared_policy: false
+      reward_function: KohondaMultiAgentF110Env
+    evaluation:
+      <<: *evaluation
+    env:
+      <<: *env
+    ppo_params:
+      <<: *ppo_params

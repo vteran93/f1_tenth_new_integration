@@ -65,8 +65,15 @@ def load_config(path):
 
 
 def init_ray(local_mode=False):
-    ray.init(local_mode=local_mode, ignore_reinit_error=True,  num_cpus=16,                   # fuerza a Ray a usar 16 hilos
-             num_gpus=0)
+    ray.init(local_mode=local_mode, ignore_reinit_error=True,
+    # El "working_dir": "." le dice a Ray que empaquete el directorio actual
+    # y lo envíe a todos los nodos trabajadores.
+    runtime_env={
+        "excludes": ["**/models*/**", "*models*/*"],
+        "working_dir": os.getcwd()
+        # "working_dir": "./lib"
+    }
+    )
 
 
 def get_logger(name, level=logging.INFO):
