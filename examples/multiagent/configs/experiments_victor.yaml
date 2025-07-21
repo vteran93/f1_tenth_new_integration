@@ -58,6 +58,7 @@ ppo_params: &ppo_params
   # Neural network initialization
   model:
     fcnet_hiddens:             [256, 256]
+    fcnet_activation: "relu"
     fcnet_weights_initializer: "truncated_normal"
     fcnet_weights_initializer_config: {"std": 0.7}
   
