@@ -91,6 +91,31 @@ merge: `bugfix_error`, `multi_agent_debug_ray`, `hyperparameter-tuning`,
   entorno con dependencias antes de basar experimentos:
   `pytest examples/multiagent/tests/`.
 
+## Reconciliación con repos externos
+
+### `SergioSV96/multiagent` (repo standalone de Sergio) — 2026-07-18
+Repo separado con **un solo commit** (`b2ab01a "Todo"`, 2025-07-20, historia
+huérfana) que contiene la versión limpia y aplanada del trabajo multiagente
+(raíz = nuestro `examples/multiagent/`). Comparación archivo por archivo (23
+archivos, sin contar basura `*:Zone.Identifier`):
+
+- **22/23 byte-idénticos** a lo que ya está en `publicacion-paper` → ya estaba
+  reconciliado por la consolidación de la mainline `multiagent`.
+- **1 difiere:** `configs/hyperparameter_tuning.yaml`. Se **mantuvo la nuestra**
+  porque:
+  - usa los nombres de parámetro SAC válidos de RLlib (`actor_lr`, `critic_lr`,
+    `alpha_lr`), mientras que la de Sergio usa `q_lr`/`policy_lr`, que **no son
+    argumentos de `SACConfig.training()`** (fallarían o se ignorarían);
+  - es superset: incluye `initial_alpha`, `twin_q`, `n_step`,
+    `training_intensity` y el experimento `oval_small_SAC_Kohonda_...`.
+  - (La variante de Sergio reduce el espacio de búsqueda; si se quisiera esa
+    poda, adaptarla con los nombres correctos de RLlib.)
+
+**Conclusión:** no hizo falta merge; el repo de Sergio está íntegramente
+contenido en `publicacion-paper`. Remoto de análisis: `git remote add sergio
+git@github.com:SergioSV96/multiagent.git` (se puede eliminar con
+`git remote remove sergio`).
+
 ## Cómo revertir
 
 El estado previo de `multiagent` está en el tag `backup/pre-consolidation-multiagent`.

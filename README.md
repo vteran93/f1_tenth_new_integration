@@ -100,6 +100,10 @@ como memoria de esa decisión (ver [`examples/multiagent/docs/INTEGRATION_evans_
 - Documentación asociada: reporte de bugs de las recompensas
   ([`examples/multiagent/docs/BUG_REPORT.md`](examples/multiagent/docs/BUG_REPORT.md)),
   detalle de la consolidación y ruta de integración de los algoritmos de Evans/Pepe.
+- Reconciliado también el repo standalone de Sergio (`SergioSV96/multiagent`,
+  snapshot "Todo" del 2025-07-20): 22/23 archivos ya idénticos; solo difería
+  `hyperparameter_tuning.yaml` (se mantuvo la nuestra, con nombres de parámetro
+  SAC válidos de RLlib). Detalle en `docs/CONSOLIDATION_publicacion-paper.md`.
 
 ## Mapa de ramas (qué era cada una)
 
