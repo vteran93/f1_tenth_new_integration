@@ -195,3 +195,10 @@ wandb/
 # Trained model checkpoints (outputs, not source)
 training_tracks/models/
 training_tracks/runs/
+venv/*
+checkpoints/
+videos/*
+wandb/*
+runs/*
+*/videos/*
+*/backups/*

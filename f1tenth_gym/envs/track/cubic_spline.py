@@ -28,12 +28,12 @@ class CubicSpline2D:
     """
 
     def __init__(self, x, y,
-        psis: Optional[np.ndarray] = None,
-        ks: Optional[np.ndarray] = None,
-        vxs: Optional[np.ndarray] = None,
-        axs: Optional[np.ndarray] = None,
-        ss: Optional[np.ndarray] = None,
-    ):
+                 psis: Optional[np.ndarray] = None,
+                 ks: Optional[np.ndarray] = None,
+                 vxs: Optional[np.ndarray] = None,
+                 axs: Optional[np.ndarray] = None,
+                 ss: Optional[np.ndarray] = None,
+                 ):
         self.xs = x
         self.ys = y
         input_vals = [x, y, psis, ks, vxs, axs, ss]
@@ -63,13 +63,13 @@ class CubicSpline2D:
                 Indicator whether the orirignal path is closed.
             '''
             if input_val is not None:
-                return input_val 
+                return input_val
             else:
                 temp_ret = constructor
                 if closed_path:
-                   temp_ret[-1] = temp_ret[0]
+                    temp_ret[-1] = temp_ret[0]
                 return temp_ret
-            
+
         self.psis = close_with_constructor(psis, self._calc_yaw_from_xy(x, y), not need_closure)
         self.ks = close_with_constructor(ks, self._calc_kappa_from_xy(x, y), not need_closure)
         self.vxs = close_with_constructor(vxs, np.ones_like(x), not need_closure)
@@ -80,15 +80,15 @@ class CubicSpline2D:
         # If yaw is provided, interpolate cosines and sines of yaw for continuity
         cosines_spline = np.cos(psis_spline)
         sines_spline = np.sin(psis_spline)
-        
+
         ks_spline = close_with_constructor(ks, self._calc_kappa_from_xy(x, y), not need_closure)
         vxs_spline = close_with_constructor(vxs, np.zeros_like(x), not need_closure)
         axs_spline = close_with_constructor(axs, np.zeros_like(x), not need_closure)
 
-        self.points = np.c_[self.xs, self.ys, 
-                            cosines_spline, sines_spline, 
+        self.points = np.c_[self.xs, self.ys,
+                            cosines_spline, sines_spline,
                             ks_spline, vxs_spline, axs_spline]
-        
+
         if need_closure:
             self.points = np.vstack(
                 (self.points, self.points[0])
@@ -103,14 +103,13 @@ class CubicSpline2D:
         # Use scipy CubicSpline to interpolate the points with periodic boundary conditions
         # This is necesaxsry to ensure the path is continuous
         self.spline = interpolate.CubicSpline(self.s, self.points, bc_type="periodic")
-        self.spline_x = np.array(self.spline.x) 
+        self.spline_x = np.array(self.spline.x)
         self.spline_c = np.array(self.spline.c)
-
 
     def find_segment_for_s(self, x):
         # Find the segment of the spline that x is in
         return (x / (self.spline.x[-1] + self.s_interval) * (len(self.spline_x) - 1)).astype(int)
-    
+
     def predict_with_spline(self, point, segment, state_index=0):
         # A (4, 100) array, where the rows contain (x-x[i])**3, (x-x[i])**2 etc.
         # exp_x = (point - self.spline.x[[segment]])[None, :] ** np.arange(4)[::-1, None]
@@ -142,7 +141,7 @@ class CubicSpline2D:
         s = [0]
         s.extend(np.cumsum(self.ds))
         return np.array(s)
-    
+
     def _calc_yaw_from_xy(self, x, y):
         dx_dt = np.gradient(x)
         dy_dt = np.gradient(y)
@@ -177,7 +176,7 @@ class CubicSpline2D:
         segment = self.find_segment_for_s(s)
         x = self.predict_with_spline(s, segment, 0)[0]
         y = self.predict_with_spline(s, segment, 1)[0]
-        return x,y
+        return x, y
 
     def calc_curvature(self, s: float) -> Optional[float]:
         """
@@ -216,10 +215,22 @@ class CubicSpline2D:
         segment = self.find_segment_for_s(s)
         k = self.points[segment, 4]
         return k
-        
+
+    def find_closest_point(self, x, y):
+        """
+        Find the closest point on the spline to a given point (x, y).
+        Returns the coordinates of the closest point and the distance.
+        """
+        trajectory = self.points[:, :2]
+        closest_point, nearest_dist, t, i = nearest_point_on_trajectory(
+            point=np.array([x, y]),
+            trajectory=trajectory
+        )
+        return closest_point, nearest_dist
+
     def calc_yaw(self, s: float) -> Optional[float]:
         """
-        Calc yaw angle at the given s.
+        Calc yaw at the given s.
 
         Parameters
         ----------
