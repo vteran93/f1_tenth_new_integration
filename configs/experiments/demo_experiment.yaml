@@ -1,0 +1,46 @@
+algorithm: PPO
+author: ''
+description: Demo configuration for quick testing
+environment:
+  collision_penalty: -10.0
+  control_input:
+  - speed
+  - steering_angle
+  integrator: rk4
+  map_name: oval_small
+  num_agents: 2
+  num_beams: 36
+  observation_config:
+    type: original
+  progress_reward_scale: 1.0
+  render_mode: null
+  reset_config:
+    type: cl_grid_static
+  safety_mode: false
+  timestep: 0.01
+name: demo_experiment
+ppo:
+  clip_param: 0.2
+  entropy_coeff: 0.01
+  gamma: 0.99
+  kl_coeff: 0.2
+  lambda_: 0.95
+  lr: 0.0001
+  normalize_actions: true
+  value_function_clip_param: 10.0
+  vf_loss_coeff: 1.0
+sac: null
+storage_path: ./models
+tags: []
+training:
+  checkpoint_interval: 1000
+  eval_interval: 2000
+  evaluation_episodes: 5
+  num_cpus_per_worker: 1
+  num_gpus: 1.0
+  num_sgd_iter: 10
+  num_workers: 4
+  reward_function: ProgressRewardEnv
+  sgd_minibatch_size: 256
+  timesteps_total: 100000
+  train_batch_size: 4000
