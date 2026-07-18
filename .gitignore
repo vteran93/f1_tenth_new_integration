@@ -191,3 +191,7 @@ examples/videos
 runs/
 videos/
 wandb/
+
+# Trained model checkpoints (outputs, not source)
+training_tracks/models/
+training_tracks/runs/
