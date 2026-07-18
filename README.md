@@ -59,8 +59,10 @@ como memoria de esa decisión (ver [`examples/multiagent/docs/INTEGRATION_evans_
   primera reorganización del repo.
 - **Pepe** — integración de los **benchmarks de Benjamin Evans** (`BDEvan5/f1tenth_benchmarks`):
   recompensas `RacePerformanceReward` y `CrossTrackHeadReward` (CTH) + `PurePursuitPlanner`
-  (baseline clásico). Llegó como *"Archivos pepe"* (ramas huérfanas `evans_integration_pepe`,
-  `evans_integration_show_simulation_pepe`, integradas por Victor). Contexto: TFM.
+  (baseline clásico). Contexto: TFM. **Nota de autoría:** este trabajo es de Pepe, pero como
+  Pepe no usaba git, fue **Victor quien lo commiteó** en su nombre; por eso figura bajo la
+  cuenta de Victor como *"Archivos pepe"* (ramas huérfanas `evans_integration_pepe`,
+  `evans_integration_show_simulation_pepe`). La autoría git ≠ autoría intelectual aquí.
 - **Victor** — búsqueda de hiperparámetros SAC y **tracks propios** (oval_small, figure8,
   complex_circuit, semi_rectangular). Ramas: `sac_experimental`, `tensorboard_validation`,
   `training_tracks`. También `benchmark_integrations` (f1tenth_benchmarks standalone).
@@ -106,7 +108,7 @@ como memoria de esa decisión (ver [`examples/multiagent/docs/INTEGRATION_evans_
 | `multiagent` | Mainline consolidada (RLlib, recompensas, callbacks, configs) | Base (fusionada) |
 | `ray-new-api`, `ray-sergio` | Migración de Sergio a RLlib (PPO) | Contenida / edición divergente descartada |
 | `tfm_implement_multi_agent`, `mmarllib-sergio` | Setup multi-agente, Windows, devcontainer, nube (terraform) | Fusionadas |
-| `evans_integration_pepe`, `evans_integration_show_simulation_pepe` | TFM de Pepe: recompensas de Evans (CTH, RacePerformance) + Pure Pursuit | Fuera (huérfanas); **portar archivos** (ver INTEGRATION doc) |
+| `evans_integration_pepe`, `evans_integration_show_simulation_pepe` | TFM de Pepe: recompensas de Evans (CTH, RacePerformance) + Pure Pursuit (autoría de Pepe; commiteado por Victor porque Pepe no usaba git) | Fuera (huérfanas); **portar archivos** (ver INTEGRATION doc) |
 | `pepe-TFM`, `tfm-pepe` | Trabajo de TFM asociado | Contenida / referencia |
 | `kohonda_rewards`, `kohonda_simplify` | Port de recompensa Kohonda (origen del aprendizaje SB3→RLlib) | Fusionadas |
 | `sac_experimental`, `tensorboard_validation`, `hyperparameter-tuning` | Búsqueda de hiperparámetros SAC + validación TensorBoard | Fusionadas / contenida |
