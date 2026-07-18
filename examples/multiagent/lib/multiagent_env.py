@@ -1,0 +1,223 @@
+# Fix for gymnasium compatibility with RLlib
+import numpy as np
+from enum import Enum
+from f1tenth_gym.envs import F110Env
+import gymnasium as gym
+from ray.rllib.env.multi_agent_env import MultiAgentEnv
+from abc import ABC, abstractmethod
+
+
+class MultiAgentF110(MultiAgentEnv, ABC):
+    """Multi-agent wrapper for F110Env."""
+
+    def __init__(self, env_config=None):
+        # Called when the environment is created.
+        super().__init__()
+        env_config = env_config or {}
+        self.env = F110Env(config=env_config, render_mode=env_config.get("render_mode"))
+        self.agents = [f"agent_{i}" for i in range(self.env.num_agents)]
+        self._last_positions = [(0.0, 0.0)] * self.env.num_agents
+        self._crashed_agents = set()  # Track which agents have crashed
+        
+        # Extract single agent spaces from multi-agent F110Env
+        self.action_space = self._make_single_agent_action_space()
+        self.observation_space = self._make_single_agent_obs_space()
+
+    def reset(self, *, seed=None, options=None):
+        # Called at the beginning of each new episode.
+        obs, info = self.env.reset(seed=seed, options=options)
+        self._last_positions = [(self.env.poses_x[i], self.env.poses_y[i]) for i in range(self.env.num_agents)]
+        self._crashed_agents = set()  # Reset crashed agents
+        self._last_s = [0.0] * self.env.num_agents  # <-- Reset progress tracker
+
+        return self._convert_obs(obs), self._convert_info(info, self.agents)
+
+    def step(self, action_dict):
+        # Called at each time step to advance the simulation.
+        # Filter actions: crashed agents get zero action
+        filtered_actions = []
+        for i, agent in enumerate(self.agents):
+            if agent in self._crashed_agents:
+                # Crashed agent gets zero action (no movement)
+                filtered_actions.append(np.zeros_like(self.env.action_space.low[0]))
+            else:
+                filtered_actions.append(action_dict.get(agent, np.zeros_like(self.env.action_space.low[0])))
+        
+        actions = np.asarray(filtered_actions)
+        obs, _, terminated, truncated, info = self.env.step(actions)
+
+        # Track newly crashed agents this step
+        newly_crashed = set()
+        for i in range(self.env.num_agents):
+            agent = self.agents[i]
+            if self.env.collisions[i] and agent not in self._crashed_agents:
+                newly_crashed.add(agent)
+                self._crashed_agents.add(agent)
+
+        # Calculate rewards and metrics
+        rewards = self._get_rewards(newly_crashed)
+        
+        # Convert observations
+        full_obs_dict = self._convert_obs(obs)
+        
+        # Build return dictionaries - only include active agents in obs
+        obs_dict = {}
+        rew_dict = {}
+        terminated_dict = {}
+        
+        for i, agent in enumerate(self.agents):
+            if agent in newly_crashed:
+                # Agent just crashed this step - include final observation and reward
+                obs_dict[agent] = full_obs_dict[agent]
+                rew_dict[agent] = rewards[i]
+                terminated_dict[agent] = True
+            elif agent not in self._crashed_agents:
+                # Agent is still active
+                obs_dict[agent] = full_obs_dict[agent]
+                rew_dict[agent] = rewards[i]
+                terminated_dict[agent] = False
+            # Note: Previously crashed agents are not included in any dict
+
+        # Episode ends when ALL agents have crashed
+        terminated_dict["__all__"] = len(self._crashed_agents) == len(self.agents)
+        
+        # Truncated dict only for active/newly crashed agents
+        truncated_dict = {agent: truncated for agent in obs_dict.keys()}
+        truncated_dict["__all__"] = truncated
+        
+        # Info dict only for active/newly crashed agents
+        info_dict = self._convert_info(info, obs_dict.keys())
+        
+        return obs_dict, rew_dict, terminated_dict, truncated_dict, info_dict
+
+    def render(self):
+        # Called to render the environment's current state.
+        return self.env.render()
+
+    def close(self):
+        # Called to clean up resources when the environment is no longer needed.
+        self.env.close()
+
+    def _get_rewards(self, newly_crashed) -> list:
+        """Iterates and computes rewards for each agent. 
+        Args:
+            newly_crashed (list): List of agents that crashed in this step.
+        Returns:
+            list: List of rewards for each agent.
+        """
+
+        # Initialize last_s tracking if not exists
+        if not hasattr(self, '_last_s'):
+            self._last_s = [0.0] * self.env.num_agents
+
+        rewards = []
+        for i in range(self.env.num_agents):
+            agent = self.agents[i]
+            reward = self._compute_reward(agent, newly_crashed, i)
+            rewards.append(reward)
+
+        return rewards
+    
+    @abstractmethod
+    def _compute_reward(self, agent, newly_crashed, i) -> float:
+        """Compute reward for a single agent.
+
+        Args:
+            agent (str): The ID of the agent (e.g., 'agent_0').
+            newly_crashed (list): List of agents that crashed in this step.
+            i (int): Index of the agent in the environment.
+
+        Returns:
+            float: The computed reward for the agent.
+        """
+        raise NotImplementedError("Subclasses must implement _compute_reward method.")
+
+    # ------------------
+    # Helper Methods
+    # ------------------
+
+    def _make_single_agent_action_space(self):
+        # Helper to create a single-agent action space from the base env.
+        """Extract single agent action space from F110Env's multi-agent action space."""
+        multi_action_space = self.env.action_space
+        if not isinstance(multi_action_space, gym.spaces.Box):
+            raise ValueError(f"Expected Box action space, got {type(multi_action_space)}")
+        single_low = multi_action_space.low[0]
+        single_high = multi_action_space.high[0]
+        return gym.spaces.Box(low=single_low, high=single_high, shape=single_low.shape, dtype=np.float32)
+
+    def _make_single_agent_obs_space(self):
+        # Helper to create a single-agent observation space from the base env.
+        """Create single agent observation space from F110Env's multi-agent space."""
+        orig_spaces = self.env.observation_space.spaces
+        single_spaces = {}
+        for key, space in orig_spaces.items():
+            if key == 'ego_idx':
+                # Keep ego_idx as Discrete space (not Box)
+                single_spaces[key] = space
+            elif hasattr(space, 'shape') and len(space.shape) > 0 and space.shape[0] == self.env.num_agents:
+                if key == 'scans':
+                    # Extract single-agent scan space (create bounds directly as float32)
+                    scan_shape = (space.shape[1],)
+                    # Increased margin to handle sensor noise and simulation edge cases
+                    low_val = np.float32(-1.0)  # Conservative margin to handle all noise outliers
+                    high_val = np.float32(space.high[0].max())
+                    single_spaces[key] = gym.spaces.Box(
+                        low=low_val, high=high_val, shape=scan_shape, dtype=np.float32
+                    )
+                else:
+                    # Scalar observations (create bounds directly as float32)
+                    low_val = np.float32(space.low[0])
+                    high_val = np.float32(space.high[0])
+                    single_spaces[key] = gym.spaces.Box(
+                        low=low_val, high=high_val, shape=(), dtype=np.float32
+                    )
+            else:
+                single_spaces[key] = space
+        return gym.spaces.Dict(single_spaces)
+
+    def _convert_obs(self, obs):
+        # Helper to convert the base env's observation into RLlib's per-agent format.
+        """Convert multi-agent observation to per-agent format."""
+        obs_dict = {}
+        for i, agent in enumerate(self.agents):
+            agent_obs = {}
+            for key, value in obs.items():
+                if key == 'ego_idx':
+                    # ego_idx is a Discrete space - pass through as-is (typically int64)
+                    agent_obs[key] = value
+                elif hasattr(value, 'shape') and len(value.shape) > 0 and value.shape[0] == self.env.num_agents:
+                    # Multi-agent observation - extract for this agent and ensure correct dtype
+                    agent_obs[key] = np.asarray(value[i], dtype=np.float32)
+                else:
+                    # Non-indexed values - ensure correct dtype
+                    agent_obs[key] = np.float32(value)
+            obs_dict[agent] = agent_obs
+        return obs_dict
+
+    def _convert_info(self, info, agent_keys):
+        # Helper to convert the base env's info dict into RLlib's per-agent format.
+        """Convert multi-agent info dict to per-agent info dicts."""
+        info_dict = {}
+        agent_id_to_idx = {agent_id: i for i, agent_id in enumerate(self.agents)}
+        for agent in agent_keys:
+            agent_idx = agent_id_to_idx[agent]
+            agent_info = {}
+            for k, v in info.items():
+                if isinstance(v, np.ndarray) and v.shape and v.shape[0] == self.env.num_agents:
+                    agent_info[k] = v[agent_idx]
+                else:
+                    agent_info[k] = v
+            info_dict[agent] = agent_info
+        return info_dict
+
+    def _calculate_lap_progress(self):
+        # Helper to calculate the normalized lap progress for each agent.
+        """Calculate lap progress for each agent."""
+        current_progress = []
+        for i in range(self.env.num_agents):
+            current_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
+                self.env.poses_x[i], self.env.poses_y[i]
+            )
+            current_progress.append(current_s)
+        return np.asarray([p / self.env.track.centerline.spline.s[-1] for p in current_progress])
