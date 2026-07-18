@@ -1,0 +1,31 @@
+{
+    "name": "F1TENTH Gym DevContainer",
+    "image": "mcr.microsoft.com/devcontainers/python:3.9", // Python 3.9 como en el README
+    "features": {
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+    },
+    "postCreateCommand": "pip install -e . && pip install -r docs/requirements.txt",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.linting.enabled": true,
+                "python.linting.flake8Enabled": true,
+                "python.formatting.provider": "black"
+            },
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-toolsai.jupyter",
+                "ms-azuretools.vscode-docker",
+                "GitHub.copilot-chat",
+                "GitHub.copilot"
+            ]
+        }
+    },
+    "mounts": [
+        "source=${localWorkspaceFolder}/.env,target=/workspace/.env,type=bind,consistency=cached"
+    ],
+    "forwardPorts": [],
+    "remoteUser": "vscode"
+}

@@ -1,5 +1,11 @@
+"""
+Ejemplo de uso del entorno F1Tenth gym con el mapa Vegas (PNG/YAML)
+Basado en waypoint_follow.py pero configurado específicamente para cargar vegas.png y vegas.yaml
+"""
+
 import time
 from typing import Tuple
+import os
 
 import gymnasium as gym
 import numpy as np
@@ -8,7 +14,7 @@ from numba import njit
 from f1tenth_gym.envs.f110_env import F110Env
 
 """
-Planner Helpers
+Planner Helpers - Copiados de waypoint_follow.py
 """
 
 
@@ -16,29 +22,16 @@ Planner Helpers
 def nearest_point_on_trajectory(point, trajectory):
     """
     Return the nearest point along the given piecewise linear trajectory.
-
-    Same as nearest_point_on_line_segment, but vectorized. This method is quite fast, time constraints should
-    not be an issue so long as trajectories are not insanely long.
-
-        Order of magnitude: trajectory length: 1000 --> 0.0002 second computation (5000fps)
-
-    point: size 2 numpy array
-    trajectory: Nx2 matrix of (x,y) trajectory waypoints
-        - these must be unique. If they are not unique, a divide by 0 error will destroy the world
     """
     diffs = trajectory[1:, :] - trajectory[:-1, :]
     l2s = diffs[:, 0] ** 2 + diffs[:, 1] ** 2
-    # this is equivalent to the elementwise dot product
-    # dots = np.sum((point - trajectory[:-1,:]) * diffs[:,:], axis=1)
     dots = np.empty((trajectory.shape[0] - 1,))
     for i in range(dots.shape[0]):
         dots[i] = np.dot((point - trajectory[i, :]), diffs[i, :])
     t = dots / l2s
     t[t < 0.0] = 0.0
     t[t > 1.0] = 1.0
-    # t = np.clip(dots / l2s, 0.0, 1.0)
     projections = trajectory[:-1, :] + (t * diffs.T).T
-    # dists = np.linalg.norm(point - projections, axis=1)
     dists = np.empty((projections.shape[0],))
     for i in range(dists.shape[0]):
         temp = point - projections[i]
@@ -57,11 +50,7 @@ def first_point_on_trajectory_intersecting_circle(
     point, radius, trajectory, t=0.0, wrap=False
 ):
     """
-    starts at beginning of trajectory, and find the first point one radius away from the given point along the trajectory.
-
-    Assumes that the first segment passes within a single radius of the point
-
-    http://codereview.stackexchange.com/questions/86421/line-segment-to-circle-collision-algorithm
+    Encuentra el primer punto en la trayectoria que intersecta con un círculo.
     """
     start_i = int(t)
     start_t = t % 1.0
@@ -69,17 +58,14 @@ def first_point_on_trajectory_intersecting_circle(
     first_i = None
     first_p = None
     trajectory = np.ascontiguousarray(trajectory)
+
     for i in range(start_i, trajectory.shape[0] - 1):
         start = trajectory[i, :]
         end = trajectory[i + 1, :] + 1e-6
-        V = np.ascontiguousarray(end - start).astype(
-            np.float32
-        )  # NOTE: specify type or numba complains
+        V = np.ascontiguousarray(end - start).astype(np.float32)
 
         a = np.dot(V, V)
-        b = np.float32(2.0) * np.dot(
-            V, start - point
-        )  # NOTE: specify type or numba complains
+        b = np.float32(2.0) * np.dot(V, start - point)
         c = (
             np.dot(start, start)
             + np.dot(point, point)
@@ -90,12 +76,11 @@ def first_point_on_trajectory_intersecting_circle(
 
         if discriminant < 0:
             continue
-        #   print "NO INTERSECTION"
-        # else:
-        # if discriminant >= 0.0:
+
         discriminant = np.sqrt(discriminant)
         t1 = (-b - discriminant) / (2.0 * a)
         t2 = (-b + discriminant) / (2.0 * a)
+
         if i == start_i:
             if t1 >= 0.0 and t1 <= 1.0 and t1 >= start_t:
                 first_t = t1
@@ -117,40 +102,6 @@ def first_point_on_trajectory_intersecting_circle(
             first_i = i
             first_p = start + t2 * V
             break
-    # wrap around to the beginning of the trajectory if no intersection is found1
-    if wrap and first_p is None:
-        for i in range(-1, start_i):
-            start = trajectory[i % trajectory.shape[0], :]
-            end = trajectory[(i + 1) % trajectory.shape[0], :] + 1e-6
-            V = (end - start).astype(np.float32)
-
-            a = np.dot(V, V)
-            b = np.float32(2.0) * np.dot(
-                V, start - point
-            )  # NOTE: specify type or numba complains
-            c = (
-                np.dot(start, start)
-                + np.dot(point, point)
-                - np.float32(2.0) * np.dot(start, point)
-                - radius * radius
-            )
-            discriminant = b * b - 4 * a * c
-
-            if discriminant < 0:
-                continue
-            discriminant = np.sqrt(discriminant)
-            t1 = (-b - discriminant) / (2.0 * a)
-            t2 = (-b + discriminant) / (2.0 * a)
-            if t1 >= 0.0 and t1 <= 1.0:
-                first_t = t1
-                first_i = i
-                first_p = start + t1 * V
-                break
-            elif t2 >= 0.0 and t2 <= 1.0:
-                first_t = t2
-                first_i = i
-                first_p = start + t2 * V
-                break
 
     return first_p, first_i, first_t
 
@@ -158,7 +109,7 @@ def first_point_on_trajectory_intersecting_circle(
 @njit(fastmath=False, cache=True)
 def get_actuation(pose_theta, lookahead_point, position, lookahead_distance, wheelbase):
     """
-    Returns actuation
+    Calcula la actuación (velocidad y ángulo de dirección) para seguir un punto objetivo.
     """
     waypoint_y = np.dot(
         np.array([np.sin(-pose_theta), np.cos(-pose_theta)], dtype=np.float32),
@@ -172,79 +123,65 @@ def get_actuation(pose_theta, lookahead_point, position, lookahead_distance, whe
     return speed, steering_angle
 
 
-class PurePursuitPlanner:
+class SimplePlanner:
     """
-    Example Planner
+    Planner simple para demostrar el uso del mapa Vegas
     """
 
     def __init__(self, track, wb):
         self.wheelbase = wb
-        self.waypoints = np.stack(
-            [track.raceline.xs, track.raceline.ys, track.raceline.vxs]
-        ).T
-        self.max_reacquire = 20.0
+        self.track = track
+        # Usar la línea de carrera del track si está disponible
+        if hasattr(track, 'raceline') and track.raceline is not None:
+            self.waypoints = np.stack(
+                [track.raceline.xs, track.raceline.ys, track.raceline.vxs]
+            ).T
+        else:
+            # Crear waypoints básicos si no hay raceline
+            self.waypoints = self._create_basic_waypoints()
 
-        self.drawn_waypoints = []
+        self.max_reacquire = 20.0
         self.lookahead_point = None
         self.current_index = None
-
         self.lookahead_point_render = None
-        self.local_plan_render = None
 
-    def load_waypoints(self, conf):
+    def _create_basic_waypoints(self):
         """
-        loads waypoints
+        Crea waypoints básicos para el mapa Vegas si no hay raceline disponible
         """
-        # NOTE: specify type or numba complains
-        self.waypoints = np.loadtxt(
-            conf.wpt_path, delimiter=conf.wpt_delim, skiprows=conf.wpt_rowskip
-        ).astype(np.float32)
+        # Waypoints básicos para demostración (pueden ser ajustados según el mapa)
+        waypoints = np.array([
+            [0.0, 0.0, 3.0],    # x, y, velocidad
+            [5.0, 0.0, 3.0],
+            [10.0, 2.0, 2.5],
+            [10.0, 5.0, 3.0],
+            [5.0, 7.0, 2.5],
+            [0.0, 5.0, 3.0],
+            [-2.0, 2.0, 2.5],
+        ], dtype=np.float32)
+        return waypoints
 
     def render_lookahead_point(self, e):
         """
-        Callback to render the lookahead point.
+        Renderiza el punto de look-ahead
         """
         if self.lookahead_point is not None:
-            points = self.lookahead_point[:2][None]  # shape (1, 2)~
+            points = self.lookahead_point[:2][None]
             if self.lookahead_point_render is None:
                 self.lookahead_point_render = e.render_points(
-                    points, color=(0, 0, 128), size=2
+                    points, color=(255, 0, 0), size=3
                 )
             else:
                 self.lookahead_point_render.setData(points)
 
-    def render_local_plan(self, e):
+    def _get_current_waypoint(self, waypoints, lookahead_distance, position, theta):
         """
-        update waypoints being drawn by EnvRenderer
-        """
-        if self.current_index is not None:
-            points = self.waypoints[self.current_index: self.current_index + 10, :2]
-            if self.local_plan_render is None:
-                self.local_plan_render = e.render_lines(
-                    points, color=(0, 128, 0), size=1
-                )
-            else:
-                self.local_plan_render.updateItems(points)
-
-    def _get_current_waypoint(
-        self, waypoints, lookahead_distance, position, theta
-    ) -> Tuple[np.ndarray, int]:
-        """
-        Returns the current waypoint to follow given the current pose.
-
-        Args:
-            waypoints: The waypoints to follow (Nx3 array)
-            lookahead_distance: The lookahead distance [m]
-            position: The current position (2D array)
-            theta: The current heading [rad]
-
-        Returns:
-            waypoint: The current waypoint to follow (x, y, speed)
-            i: The index of the current waypoint
+        Obtiene el waypoint actual a seguir
         """
         wpts = waypoints[:, :2]
         lookahead_distance = np.float32(lookahead_distance)
         nearest_point, nearest_dist, t, i = nearest_point_on_trajectory(position, wpts)
+
         if nearest_dist < lookahead_distance:
             t1 = np.float32(i + t)
             lookahead_point, i2, t2 = first_point_on_trajectory_intersecting_circle(
@@ -253,20 +190,20 @@ class PurePursuitPlanner:
             if i2 is None:
                 return None, None
             current_waypoint = np.empty((3,), dtype=np.float32)
-            # x, y
             current_waypoint[0:2] = wpts[i2, :]
-            # speed
             current_waypoint[2] = waypoints[i, -1]
             return current_waypoint, i
         elif nearest_dist < self.max_reacquire:
-            # NOTE: specify type or numba complains
-            return wpts[i, :], i
+            current_waypoint = np.empty((3,), dtype=np.float32)
+            current_waypoint[0:2] = wpts[i, :]
+            current_waypoint[2] = waypoints[i, -1]
+            return current_waypoint, i
         else:
             return None, None
 
     def plan(self, pose_x, pose_y, pose_theta, lookahead_distance, vgain):
         """
-        gives actuation given observation
+        Planifica la actuación dado el estado actual
         """
         position = np.array([pose_x, pose_y])
         lookahead_point, i = self._get_current_waypoint(
@@ -274,13 +211,13 @@ class PurePursuitPlanner:
         )
 
         if lookahead_point is None:
-            return 4.0, 0.0
+            return 2.0, 0.0  # Velocidad baja y sin giro si no hay waypoint
 
-        # for rendering
+        # Guardar para rendering
         self.lookahead_point = lookahead_point
         self.current_index = i
 
-        # actuation
+        # Calcular actuación
         speed, steering_angle = get_actuation(
             pose_theta,
             self.lookahead_point,
@@ -295,21 +232,46 @@ class PurePursuitPlanner:
 
 def main():
     """
-    main entry point
+    Función principal que demuestra cómo cargar el mapa Vegas
     """
+    print("🏎️  Iniciando ejemplo con mapa Vegas (PNG/YAML)")
 
+    # Configuración del planner
     work = {
         "mass": 3.463388126201571,
         "lf": 0.15597534362552312,
-        "tlad": 0.82461887897713965 * 10,
-        "vgain": 1.0,
+        "tlad": 0.82461887897713965 * 5,  # Lookahead distance reducida para el ejemplo
+        "vgain": 0.8,  # Ganancia de velocidad reducida para mayor control
     }
 
+    # Configuración del entorno
     num_agents = 1
+
+    # Ruta absoluta al mapa Vegas (sin extensión)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    maps_dir = os.path.join(os.path.dirname(current_dir), "maps")
+    vegas_map_path = os.path.join(maps_dir, "vegas")
+
+    print(f"📍 Cargando mapa Vegas desde: {vegas_map_path}")
+    print(f"   - Archivo YAML: {vegas_map_path}.yaml")
+    print(f"   - Archivo PNG:  {vegas_map_path}.png")
+
+    # Verificar que los archivos existen
+    if not os.path.exists(f"{vegas_map_path}.yaml"):
+        print("❌ Error: No se encontró vegas.yaml")
+        return
+    if not os.path.exists(f"{vegas_map_path}.png"):
+        print("❌ Error: No se encontró vegas.png")
+        return
+
+    print("✅ Archivos del mapa encontrados")
+
+    # Crear el entorno con el mapa Vegas
     env = gym.make(
         "f1tenth_gym:f1tenth-v0",
         config={
-            "map": "Spielberg_blank",
+            "map": vegas_map_path,  # Ruta sin extensión
+            "map_ext": ".png",      # Extensión de la imagen
             "num_agents": num_agents,
             "timestep": 0.01,
             "integrator": "rk4",
@@ -322,9 +284,17 @@ def main():
         },
         render_mode="human",
     )
-    track = env.unwrapped.track
 
-    planner = PurePursuitPlanner(
+    print("✅ Entorno creado exitosamente")
+
+    # Obtener el track y crear el planner
+    track = env.unwrapped.track
+    print(f"📏 Información del mapa Vegas:")
+    print(f"   - Resolución: {track.spec.resolution} m/pixel")
+    print(f"   - Origen: {track.spec.origin}")
+    print(f"   - Tamaño de imagen: {track.occupancy_grid.shape}")
+
+    planner = SimplePlanner(
         track=track,
         wb=(
             F110Env.fullscale_vehicle_params()["lf"]
@@ -332,43 +302,64 @@ def main():
         ),
     )
 
-    env.unwrapped.add_render_callback(track.raceline.render_waypoints)
-    env.unwrapped.add_render_callback(planner.render_local_plan)
+    # Agregar callbacks de renderizado
+    if hasattr(track, 'raceline') and track.raceline is not None:
+        env.unwrapped.add_render_callback(track.raceline.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_lookahead_point)
 
+    # Inicializar el entorno
     obs, info = env.reset()
     done = False
     env.render()
 
+    print("🚦 Iniciando simulación...")
+    print("   - Usa ESC para cerrar la ventana")
+    print("   - El coche seguirá los waypoints automáticamente")
+
     laptime = 0.0
     start = time.time()
+    step_count = 0
 
-    while not done:
-        action = env.action_space.sample()
-        for i, agent_id in enumerate(obs.keys()):
-            speed, steer = planner.plan(
-                obs[agent_id]["pose_x"],
-                obs[agent_id]["pose_y"],
-                obs[agent_id]["pose_theta"],
-                work["tlad"],
-                work["vgain"],
-            )
-            action[i] = np.array([steer, speed])
-        obs, step_reward, done, truncated, info = env.step(action)
-        laptime += step_reward
-        frame = env.render()
+    try:
+        while not done:
+            # Planificar acción para cada agente
+            action = env.action_space.sample()  # Inicializar con acción aleatoria
 
-    print("Sim elapsed time:", laptime, "Real elapsed time:", time.time() - start)
+            for i, agent_id in enumerate(obs.keys()):
+                speed, steer = planner.plan(
+                    obs[agent_id]["pose_x"],
+                    obs[agent_id]["pose_y"],
+                    obs[agent_id]["pose_theta"],
+                    work["tlad"],
+                    work["vgain"],
+                )
+                action[i] = np.array([steer, speed])
+
+            # Ejecutar paso de simulación
+            obs, step_reward, done, truncated, info = env.step(action)
+            laptime += step_reward
+            frame = env.render()
+
+            step_count += 1
+
+            # Mostrar información cada 100 pasos
+            if step_count % 100 == 0:
+                agent_id = list(obs.keys())[0]
+                print(f"Paso {step_count}: x={obs[agent_id]['pose_x']:.2f}, "
+                      f"y={obs[agent_id]['pose_y']:.2f}, "
+                      f"θ={obs[agent_id]['pose_theta']:.2f}")
+
+    except KeyboardInterrupt:
+        print("\n🛑 Simulación interrumpida por el usuario")
+
+    finally:
+        env.close()
+        print(f"\n📊 Estadísticas de la simulación:")
+        print(f"   - Tiempo simulado: {laptime:.2f}s")
+        print(f"   - Tiempo real: {time.time() - start:.2f}s")
+        print(f"   - Pasos totales: {step_count}")
+        print("✅ Ejemplo completado")
 
 
 if __name__ == "__main__":
     main()
-# %%
-work = {
-    "mass": 3.463388126201571,
-    "lf": 0.15597534362552312,
-    "tlad": 0.82461887897713965 * 10,
-    "vgain": 1,
-}
-
-num_agents = 1

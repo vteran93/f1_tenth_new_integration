@@ -187,3 +187,7 @@ vpnv/
 *.zip
 # Claude Code local tooling
 .claude/
+examples/videos
+runs/
+videos/
+wandb/
