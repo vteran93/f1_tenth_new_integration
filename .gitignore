@@ -176,3 +176,14 @@ cython_debug/
 examples/wandb
 examples/models
 examples/runs
+# --- Consolidation cleanup (publicacion-paper) ---
+# Windows "mark of the web" alternate-data-stream junk
+*:Zone.Identifier
+# Local VPN / secret configs (never commit credentials)
+*.conf
+vpnv/
+# Rendered episode videos and archives (large binaries)
+*.mp4
+*.zip
+# Claude Code local tooling
+.claude/
