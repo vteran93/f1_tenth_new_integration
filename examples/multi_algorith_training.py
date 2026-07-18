@@ -119,12 +119,12 @@ class CustomWandbCallback(WandbCallback):
 
 
 class IncrementalSaveCallback(BaseCallback):
-    def __init__(self, save_freq: int, save_path: str, checkpoint_path: str, model: str, verbose: int = 0):
+    def __init__(self, save_freq: int, save_path: str, checkpoint_path: str, model_name: str, verbose: int = 0):
         super().__init__(verbose)
         self.save_freq = save_freq
         self.save_path = save_path
         self.checkpoint_path = checkpoint_path
-        self.model = model
+        self.model_name = model_name
 
     def _init_callback(self) -> None:
         # Create save directory if it doesn't exist
@@ -136,7 +136,7 @@ class IncrementalSaveCallback(BaseCallback):
         if self.n_calls % self.save_freq == 0:
             # Save model
             model_path = os.path.join(
-                self.save_path, f"{self.model}_checkpoint_{self.n_calls}.zip")
+                self.save_path, f"{self.model_name}_checkpoint_{self.n_calls}.zip")
             self.model.save(model_path)
 
             # Save checkpoint info
@@ -295,7 +295,7 @@ def train(model_name, model_cfg, env, total_timesteps, save_freq, models_dir, ch
         save_freq=save_freq,
         save_path=models_dir,
         checkpoint_path=checkpoint_path,
-        model=model_name,
+        model_name=model_name,
         verbose=1
     )
     wandb_callback = CustomWandbCallback(
@@ -309,7 +309,7 @@ def train(model_name, model_cfg, env, total_timesteps, save_freq, models_dir, ch
     start_time = time.time()
     model = model_cfg['constructor'](
         **model_cfg['params'],
-        env=env,
+        env=env, # parque
         verbose=1,
         tensorboard_log=f"runs/{run.id}",
         device=device
@@ -346,7 +346,13 @@ def evaluate(model_name, model_cfg, model_path, gym_env, env_config, device, rec
         render_mode="rgb_array" if record_video else "human",
     )
     if record_video and videos_dir:
-        video_filename = f"{model_name}_eval_{int(time.time())}"
+        import re
+        result_re = re.search(r'_checkpoint_(\d+)\.zip$', model_path)
+        if result_re:
+            checkpoint_number = result_re.group(1)
+        else:
+            checkpoint_number = "final"
+        video_filename = f"{model_name}_eval_checkpoint_{checkpoint_number}_{int(time.time())}"
         eval_env = setup_video_recording(eval_env, videos_dir, video_filename)
         print(f"Recording video: {video_filename}")
     obs, info = eval_env.reset()
@@ -372,8 +378,9 @@ def evaluate(model_name, model_cfg, model_path, gym_env, env_config, device, rec
 
 
 def main():
-    train_mode = False  # Cambia a True para entrenar
-
+    train_mode = True  # Cambia a True para entrenar
+    record_video = False
+    evaluate_all_checkpoints = False  # Cambia a False para evaluar solo el último modelo
     gym_env = "f1tenth_gym:victor-multi-agent-v0"
     env_config = {
         "map": "Spielberg",
@@ -386,14 +393,14 @@ def main():
         "observation_config": {"type": "multi_rl"},
         "reset_config": {"type": "rl_random_static"},
     }
-    policy = gym_env.split(":")[-1] + "31005216_debug_callback"
+    multithreading = False  # Cambia a True para usar SubprocVecEnv
+    policy = gym_env.split(":")[-1] + "02_06_25_1_10K"
     # MlpPolicy para single-agent, `MultiInputPolicy` para multi-agent
     model_policy = "MultiInputPolicy"
     optimize_memory_usage = False  # No se puede optimizar memoria con `MultiInputPolicy`
     device = "cuda"
-    record_video = True
-    total_timesteps = 30_000
-    save_freq = 10_000
+    total_timesteps = 10_000  # Total timesteps para entrenamiento
+    save_freq = 1_000
     learning_rate = 5e-4  # Mismo learning rate para todos los modelos
     num_envs = 15
     buffer_size = 100_000  # Tamaño del buffer de replay para DDPG y SAC
@@ -460,9 +467,11 @@ def main():
             }
         }
     }
-
-    env_fns = [make_env(gym_env, config=env_config) for _ in range(num_envs)]
-    env = SubprocVecEnv(env_fns)
+    if multithreading:
+        env_fns = [make_env(gym_env, config=env_config) for _ in range(num_envs)]
+        env = SubprocVecEnv(env_fns)
+    else:
+        env = make_env(gym_env, config=env_config)()
 
     print("Train mode:", train_mode)
     if train_mode:
@@ -494,6 +503,31 @@ def main():
                 print(f"No final model found for {model_name}")
                 continue
             latest_model = sorted(model_files)[-1]
+            if evaluate_all_checkpoints:
+                models_to_evaluate = find_all_models(models_dir)
+                for i, checkpoint in enumerate(models_to_evaluate):
+                    model_path = checkpoint["model_path"]
+                    timesteps = checkpoint["timesteps_completed"]
+
+                    print(f"\n{'='*60}")
+                    print(f"Evaluating checkpoint {i+1}/{len(models_to_evaluate)}")
+                    print(f"Model: {model_path}")
+                    print(f"Timesteps: {timesteps:,}")
+                    print(f"{'='*60}")
+                    evaluate(
+                        model_name,
+                        model_cfg,
+                        model_path,
+                        gym_env,
+                        env_config,
+                        device,
+                        record_video=record_video,
+                        videos_dir=videos_dir if record_video else None
+                    )
+            if not models_to_evaluate:
+                print("No checkpoint models found in 'models' directory")
+                exit(1)
+            print(f"Found {len(models_to_evaluate)} checkpoints to evaluate")
             evaluate(
                 model_name,
                 model_cfg,
