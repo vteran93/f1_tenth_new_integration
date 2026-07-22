@@ -37,7 +37,8 @@ class OriginalObservation(Observation):
         scan_range = (
             self.env.unwrapped.sim.agents[0].scan_simulator.max_range + 0.5
         )  # add 1.0 to avoid small errors
-        large_num = 1e30  # large number to avoid unbounded obs space (ie., low=-inf or high=inf)
+        # large number to avoid unbounded obs space (ie., low=-inf or high=inf)
+        large_num = 1e30
 
         obs_space = gym.spaces.Dict(
             {
@@ -148,7 +149,8 @@ class OriginalObservation(Observation):
             if isinstance(observations[key], np.ndarray) or isinstance(
                 observations[key], list
             ):
-                observations[key] = np.array(observations[key], dtype=np.float32)
+                observations[key] = np.array(
+                    observations[key], dtype=np.float32)
 
         return observations
 
@@ -161,7 +163,8 @@ class FeaturesObservation(Observation):
     def space(self):
         scan_size = self.env.unwrapped.sim.agents[0].scan_simulator.num_beams
         scan_range = self.env.unwrapped.sim.agents[0].scan_simulator.max_range
-        large_num = 1e30  # large number to avoid unbounded obs space (ie., low=-inf or high=inf)
+        # large number to avoid unbounded obs space (ie., low=-inf or high=inf)
+        large_num = 1e30
 
         complete_space = {}
         for agent_id in self.env.unwrapped.agent_ids:
@@ -254,7 +257,8 @@ class FeaturesObservation(Observation):
                     or isinstance(obs[agent_id][key], list)
                     or isinstance(obs[agent_id][key], float)
                 ):
-                    obs[agent_id][key] = np.array(obs[agent_id][key], dtype=np.float32)
+                    obs[agent_id][key] = np.array(
+                        obs[agent_id][key], dtype=np.float32)
 
         return obs
 
@@ -266,7 +270,8 @@ class VectorObservation(Observation):
 
     def space(self):
         scan_size = self.env.unwrapped.sim.agents[0].scan_simulator.num_beams
-        large_num = 1e30  # large number to avoid unbounded obs space (ie., low=-inf or high=inf)
+        # large number to avoid unbounded obs space (ie., low=-inf or high=inf)
+        large_num = 1e30
 
         num_agents = len(self.env.unwrapped.agent_ids)
         assert num_agents == 1, "Vector observation only supports single agent"

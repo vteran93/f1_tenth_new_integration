@@ -1,0 +1,48 @@
+algorithm: SAC
+author: ''
+description: SAC configuration for exploration and continuous control
+environment:
+  collision_penalty: -10.0
+  control_input:
+  - speed
+  - steering_angle
+  integrator: rk4
+  map_name: oval_large
+  num_agents: 2
+  num_beams: 36
+  observation_config:
+    type: original
+  progress_reward_scale: 1.0
+  render_mode: null
+  reset_config:
+    type: cl_grid_static
+  safety_mode: false
+  timestep: 0.01
+name: sac_exploration
+ppo: null
+sac:
+  actor_lr: 0.0003
+  alpha_lr: 0.0003
+  critic_lr: 0.0003
+  gamma: 0.99
+  normalize_actions: true
+  replay_buffer_size: 1000000
+  target_entropy: auto
+  tau: 0.005
+storage_path: ./models
+tags:
+- sac
+- exploration
+- continuous_control
+training:
+  checkpoint_interval: 1000
+  eval_interval: 2000
+  evaluation_episodes: 5
+  num_cpus_per_worker: 1
+  num_gpus: 1.0
+  num_sgd_iter: 10
+  num_workers: 4
+  reward_function: ProgressRewardEnv
+  sgd_minibatch_size: 256
+  timesteps_total: 3000000
+  train_batch_size: 4000
