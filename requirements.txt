@@ -10,6 +10,7 @@ scipy==1.15.3
 torch==2.7.1
 ray==2.47.0
 stable-baselines3==2.6.0
+optuna==4.9.0  # required by ray.tune OptunaSearch for hyperparameter tuning (run.py)
 
 # Data Processing & Analysis
 pandas==2.3.0

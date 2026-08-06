@@ -13,9 +13,11 @@ from lib.utils import (
     validate_hyperparameter_config
 )
 from lib.callbacks import SaveConfig, MultipleAgentCallbacks
+from lib.nan_detection import NaNProtectedTorchDiagGaussian
 from ray import tune
 from ray.rllib.algorithms.ppo import PPOConfig
 from ray.rllib.algorithms.sac import SACConfig
+from ray.rllib.models import ModelCatalog
 from ray.rllib.policy.policy import PolicySpec
 from ray.rllib.algorithms.algorithm import Algorithm
 from ray.tune.analysis import ExperimentAnalysis
@@ -32,6 +34,32 @@ ALGO_MAP = {
 }
 
 SEED = 42
+
+# Name under which the NaN-protected Gaussian action distribution is registered.
+# Enabling `nan_protection: true` in a config injects this as the policy's
+# custom_action_dist, which sanitises NaN/inf action means and log-stds before the
+# Normal distribution is built. This prevents the hard crash observed on long PPO runs
+# ("Expected parameter loc ... to satisfy the constraint Real()") that otherwise kills
+# the trial mid-iteration. See lib/nan_detection.py.
+NAN_PROTECTED_ACTION_DIST = "nan_protected_gaussian"
+
+
+def register_nan_protected_action_dist():
+    """Register the NaN-protected action distribution under its catalog name.
+
+    Called once on the driver at import time. RLlib serialises the custom
+    ModelCatalog registration into the algorithm config, so the tune trainable
+    actor and every env_runner resolve the name without needing to re-register
+    (verified: the distribution is constructed in the worker processes, not only
+    the driver). Re-registering the same name is idempotent.
+    """
+    ModelCatalog.register_custom_action_dist(
+        NAN_PROTECTED_ACTION_DIST, NaNProtectedTorchDiagGaussian
+    )
+
+
+# Register on the driver at import time.
+register_nan_protected_action_dist()
 
 
 class TimestepsStopper(Stopper):
@@ -64,6 +92,15 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn, num_en
     # Clean up the config before passing to training
     if 'environment' in algo_config_file:
         del algo_config_file['environment']
+
+    # Opt-in NaN protection: route the policy through the NaN-protected action
+    # distribution. Injected into the model config so it is serialised to every
+    # env_runner/learner rather than relying on a driver-only monkey-patch.
+    if config.get('nan_protection', False):
+        model_cfg = dict(algo_config_file.get('model', {}))
+        model_cfg['custom_action_dist'] = NAN_PROTECTED_ACTION_DIST
+        algo_config_file['model'] = model_cfg
+        logger.info(f"NaN protection enabled: using custom_action_dist='{NAN_PROTECTED_ACTION_DIST}'")
 
     algo_config = (
         AlgoConfigClass()
@@ -323,7 +360,7 @@ if __name__ == '__main__':
     # Get env_runners configuration from global config
     global_num_env_runners = config_data.get('num_env_runners', 8)
     global_num_envs_per_env_runner = config_data.get('num_envs_per_env_runner', 2)
-    
+
     init_ray(num_cpus=num_cpus)
 
     if args.command == 'train':
