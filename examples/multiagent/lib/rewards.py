@@ -589,3 +589,162 @@ class KohondaMultiAgentF110Env(MultiAgentF110):
         pos = np.array([self.env.poses_x[idx], self.env.poses_y[idx]], dtype=self._waypoints.dtype)
         pt, _, _, index = nearest_point_on_trajectory(point=pos, trajectory=self._waypoints)
         return pt, int(index)
+
+
+class CrossTrackHeadRewardEnv(MultiAgentF110):
+    """Evans-style Cross-Track + Heading-Error reward (CTH).
+
+    Ported from BDEvan5/f1tenth_benchmarks (branch evans_integration_pepe,
+    examples/rewards.py::CrossTrackHeadReward) into our MultiAgentF110, with the fixes
+    from docs/INTEGRATION_evans_kohonda.md: the reference line and its heading come from
+    the env's raceline instead of re-reading a CSV, and the closest point is found with
+    nearest_point_on_trajectory (njit) instead of a per-step brute-force argmin.
+
+    reward = -cte_scale * min(CTE, max_cte) - he_scale * min(|HE|, max_he)
+    collision -> single large terminal penalty.
+    Constants are Evans' own from evans_integration_pepe:examples/config.yaml.
+
+    NOTE (honest caveat): CTH has NO progress or speed term. The reward is always <= 0
+    and is maximised (= 0) by sitting on the reference line pointing the right way, so a
+    stationary car is a valid optimum -- same failure mode family as ProgressRewardEnv.
+    Kept faithful to Evans on purpose; interpret the comparison with this in mind.
+    """
+    CTE_SCALE = 3.0
+    HE_SCALE = 2.0
+    MAX_CTE = 2.0
+    MAX_HE = 0.7854          # pi/4
+    COLLISION_PENALTY = 100.0
+
+    def __init__(self, env_config=None):
+        super().__init__(env_config=env_config)
+        rl = self.env.track.raceline
+        self._wp = np.stack([rl.xs, rl.ys], axis=-1).astype(np.float32)
+        # Heading at each waypoint = tangent between consecutive points (wrap around).
+        dx = np.roll(self._wp[:, 0], -1) - self._wp[:, 0]
+        dy = np.roll(self._wp[:, 1], -1) - self._wp[:, 1]
+        self._wp_yaw = np.arctan2(dy, dx).astype(np.float32)
+        self._crashed_agents = set()
+
+    def _compute_reward(self, agent, newly_crashed, i) -> float:
+        if agent in self._crashed_agents and agent not in newly_crashed:
+            return 0.0
+        if agent in newly_crashed:
+            self._crashed_agents.add(agent)
+            return -self.COLLISION_PENALTY
+
+        pos = np.array([self.env.poses_x[i], self.env.poses_y[i]], dtype=self._wp.dtype)
+        _, dist, _, idx = nearest_point_on_trajectory(point=pos, trajectory=self._wp)
+        cte = float(dist)
+        he = float(self.env.poses_theta[i]) - float(self._wp_yaw[idx])
+        he = float(np.arctan2(np.sin(he), np.cos(he)))
+
+        reward = (-self.CTE_SCALE * min(cte, self.MAX_CTE)
+                  - self.HE_SCALE * min(abs(he), self.MAX_HE))
+        return float(reward)
+
+
+class RacePerformanceRewardEnv(MultiAgentF110):
+    """Evans-style multi-component race reward.
+
+    Ported from evans_integration_pepe:examples/rewards.py::RacePerformanceReward into
+    MultiAgentF110, applying the fixes from docs/INTEGRATION_evans_kohonda.md rather than
+    copying the original bugs:
+      - progress = monotonic arc-length delta along the centerline (NOT lap_counts +
+        poses_x/100, which used a world coordinate),
+      - speed = measured ground speed from position delta / timestep (NOT the commanded
+        action),
+      - overtake = event bonus when this agent moves from behind to ahead of another in
+        cumulative arc-length (NOT a per-step lap_counts comparison).
+      - jerk = mean |action - prev_action| on the raw action passed to step().
+    Constants are Evans' own from evans_integration_pepe:examples/config.yaml.
+
+    reward = progress_scale*dprog + speed_term + collision(terminal) + overtake + jerk
+    """
+    PROGRESS_SCALE = 15.0
+    SPEED_SCALE = 5.0
+    COLLISION_PENALTY = 350.0
+    OVERTAKE_BONUS = 50.0
+    STALL_PENALTY = 10.0
+    JERK_PENALTY = 4.0
+    MIN_SPEED = 1.0
+
+    def __init__(self, env_config=None):
+        super().__init__(env_config=env_config)
+        self._crashed_agents = set()
+        self._timestep = float(self.env.config.get("timestep", 0.01))
+        self._cur_action = {}
+        self._last_action = {}
+        self._prev_s = None
+        self._cum_s = None
+        self._prev_xy = None
+        self._prev_ahead = None
+
+    def reset(self, *, seed=None, options=None):
+        obs, info = super().reset(seed=seed, options=options)
+        n = self.env.num_agents
+        self._crashed_agents = set()
+        self._last_action = {a: np.zeros(2, dtype=np.float32) for a in self.agents}
+        self._cur_action = {a: np.zeros(2, dtype=np.float32) for a in self.agents}
+        self._prev_s = [self._arclen(i) for i in range(n)]
+        self._cum_s = [0.0] * n
+        self._prev_xy = [(float(self.env.poses_x[i]), float(self.env.poses_y[i])) for i in range(n)]
+        self._prev_ahead = [[False] * n for _ in range(n)]
+        return obs, info
+
+    def _arclen(self, i):
+        s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
+            float(self.env.poses_x[i]), float(self.env.poses_y[i]))
+        return float(s)
+
+    def step(self, action_dict):
+        # Stash the raw actions this step for the jerk term before the base env consumes them.
+        self._cur_action = {
+            a: np.asarray(action_dict.get(a, np.zeros(2)), dtype=np.float32) for a in self.agents
+        }
+        return super().step(action_dict)
+
+    def _compute_reward(self, agent, newly_crashed, i) -> float:
+        if agent in self._crashed_agents and agent not in newly_crashed:
+            return 0.0
+        if agent in newly_crashed:
+            self._crashed_agents.add(agent)
+            return -self.COLLISION_PENALTY
+
+        L = float(self.env.track.centerline.spline.s[-1])
+
+        # Progress: monotonic arc-length delta (with lap wrap).
+        cur_s = self._arclen(i)
+        d = cur_s - self._prev_s[i]
+        if d < -0.5 * L:
+            d += L
+        d = max(0.0, d)
+        self._cum_s[i] += d
+        self._prev_s[i] = cur_s
+        progress_reward = self.PROGRESS_SCALE * d
+
+        # Speed: measured ground speed from position delta.
+        x, y = float(self.env.poses_x[i]), float(self.env.poses_y[i])
+        px, py = self._prev_xy[i]
+        speed = np.hypot(x - px, y - py) / self._timestep
+        self._prev_xy[i] = (x, y)
+        if speed > self.MIN_SPEED:
+            speed_reward = self.SPEED_SCALE * (speed - self.MIN_SPEED)
+        else:
+            speed_reward = -self.STALL_PENALTY
+
+        # Overtake: event bonus when moving from behind to ahead of another agent.
+        overtake_reward = 0.0
+        for j in range(self.env.num_agents):
+            if j == i:
+                continue
+            ahead = self._cum_s[i] > self._cum_s[j]
+            if ahead and not self._prev_ahead[i][j]:
+                overtake_reward += self.OVERTAKE_BONUS
+            self._prev_ahead[i][j] = ahead
+
+        # Jerk: change in commanded action.
+        jerk = float(np.mean(np.abs(self._cur_action[agent] - self._last_action[agent])))
+        self._last_action[agent] = self._cur_action[agent]
+        jerk_reward = -self.JERK_PENALTY * jerk
+
+        return float(progress_reward + speed_reward + overtake_reward + jerk_reward)
