@@ -109,6 +109,13 @@ experiments:
   # PPO experiments with Spielberg
   - name: Spielberg_PPO_Individual_Policy_ProgressRewardAdvanced
     storage_path: ../models_deposito
+    # This run previously diverged to NaN in the policy mean (~357k steps) and the
+    # trial died with "Expected parameter loc ... to satisfy the constraint Real()".
+    # nan_protection routes the policy through a NaN-protected action distribution
+    # that sanitises the offending values and logs a warning instead of crashing.
+    # If the warning fires repeatedly, treat it as a divergence signal (lower lr /
+    # tighter grad_clip), not a clean fix.
+    nan_protection: true
     training:
       <<: *training
       algorithm:     PPO

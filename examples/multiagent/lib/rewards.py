@@ -53,6 +53,75 @@ class ProgressRewardEnv(MultiAgentF110):
         return reward
 
 
+class ProgressTimePenaltyEnv(MultiAgentF110):
+    """Monotonic progress reward + per-step time penalty + large terminal crash penalty.
+
+    Fixes the 'crawl forever' degenerate optimum seen with ProgressRewardEnv and
+    SpeedRewardEnv on this task. The multi-agent wrapper only ends an episode when all
+    agents crash (no time limit, no lap-based termination), so with a pure progress or
+    raw-speed reward, driving slowly and never crashing is optimal. A per-step time
+    penalty makes dawdling cost reward, so completing the track FASTER yields more net
+    reward -- without rewarding raw speed (which the reward-shaping guidance advises
+    against). Follows references/reward_shaping.md:
+      - forward progress along the centerline, clipped to be non-decreasing (no credit
+        for going backward -> no back-and-forth finish-line farming),
+      - minus a small per-step time penalty,
+      - collision as a single large TERMINAL penalty, not a per-step cost.
+
+    Constants (edit to tune). With track length ~70 m and timestep 0.01 s:
+      net reward per lap = 70 - TIME_PENALTY * (steps in the lap), so faster laps score
+      strictly higher. At TIME_PENALTY=0.02 a lap is net-positive down to ~1 m/s, so the
+      agent is never pushed to crash on purpose, while CRASH_PENALTY=50 (> a slow lap's
+      bleed) keeps crashing unattractive.
+    """
+    TIME_PENALTY = 0.02    # reward subtracted every step -> punishes slowness
+    CRASH_PENALTY = 50.0   # large one-off terminal penalty on collision
+
+    def __init__(self, env_config=None):
+        super().__init__(env_config=env_config)
+
+    def reset(self, *, seed=None, options=None):
+        obs, info = super().reset(seed=seed, options=options)
+        # Seed the progress tracker with the actual starting arc-length, so the first
+        # step does not score a spurious jump from s=0 to the start position.
+        for i in range(self.env.num_agents):
+            s0, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
+                self.env.poses_x[i].item(), self.env.poses_y[i].item()
+            )
+            self._last_s[i] = s0
+        return obs, info
+
+    def _compute_reward(self, agent, newly_crashed, i):
+        # Already-crashed agents: value is unused by the learner (agent is done).
+        if agent in self._crashed_agents and agent not in newly_crashed:
+            return np.nan
+
+        # Collision this step: single large terminal penalty, no progress term.
+        if agent in newly_crashed:
+            return -self.CRASH_PENALTY
+
+        # Forward progress along the centerline since last step.
+        current_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
+            self.env.poses_x[i].item(), self.env.poses_y[i].item()
+        )
+        track_len = self.env.track.centerline.spline.s[-1]
+        prog = current_s - self._last_s[i]
+
+        # Lap wrap in BOTH directions: forward crossing shows s jump ~track_len -> ~0
+        # (large negative); backward crossing shows ~0 -> ~track_len (large positive) and
+        # must be undone too, else driving backward across the line farms ~track_len.
+        if prog > 0.5 * track_len:
+            prog -= track_len
+        elif prog < -0.5 * track_len:
+            prog += track_len
+
+        # Monotonic: no reward for moving backward (kills finish-line farming).
+        prog = max(0.0, prog)
+
+        self._last_s[i] = current_s
+        return prog - self.TIME_PENALTY
+
+
 class ProgressRewardAdvancedEnv(MultiAgentF110):
     """Advanced progress reward with enhanced scaling and crash handling."""
 
