@@ -653,8 +653,9 @@ class RacePerformanceRewardEnv(MultiAgentF110):
         poses_x/100, which used a world coordinate),
       - speed = measured ground speed from position delta / timestep (NOT the commanded
         action),
-      - overtake = event bonus when this agent moves from behind to ahead of another in
-        cumulative arc-length (NOT a per-step lap_counts comparison).
+      - overtake = event bonus when this agent passes another in absolute race
+        position (laps*L + arc-length), compared synchronously across agents and seeded
+        from the grid start positions (NOT a per-step lap_counts comparison).
       - jerk = mean |action - prev_action| on the raw action passed to step().
     Constants are Evans' own from evans_integration_pepe:examples/config.yaml.
 
@@ -675,7 +676,6 @@ class RacePerformanceRewardEnv(MultiAgentF110):
         self._cur_action = {}
         self._last_action = {}
         self._prev_s = None
-        self._cum_s = None
         self._prev_xy = None
         self._prev_ahead = None
 
@@ -686,15 +686,27 @@ class RacePerformanceRewardEnv(MultiAgentF110):
         self._last_action = {a: np.zeros(2, dtype=np.float32) for a in self.agents}
         self._cur_action = {a: np.zeros(2, dtype=np.float32) for a in self.agents}
         self._prev_s = [self._arclen(i) for i in range(n)]
-        self._cum_s = [0.0] * n
         self._prev_xy = [(float(self.env.poses_x[i]), float(self.env.poses_y[i])) for i in range(n)]
-        self._prev_ahead = [[False] * n for _ in range(n)]
+        # Seed the ahead matrix from the actual grid start positions (agents start at
+        # different arc-lengths) so no overtake bonus fires until a real pass occurs.
+        L0 = float(self.env.track.centerline.spline.s[-1])
+        pos0 = [self._abs_pos(k, L0) for k in range(n)]
+        self._prev_ahead = [[pos0[a] > pos0[b] for b in range(n)] for a in range(n)]
         return obs, info
 
     def _arclen(self, i):
         s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
             float(self.env.poses_x[i]), float(self.env.poses_y[i]))
         return float(s)
+
+    def _abs_pos(self, j, L):
+        """Unwrapped absolute race position of agent j at the current sim state.
+
+        laps * L + arc-length, so agents on different laps or grid slots compare by
+        true track order rather than by distance travelled this episode.
+        """
+        lap = float(self.env.lap_counts[j]) if hasattr(self.env, "lap_counts") else 0.0
+        return lap * L + self._arclen(j)
 
     def step(self, action_dict):
         # Stash the raw actions this step for the jerk term before the base env consumes them.
@@ -712,13 +724,18 @@ class RacePerformanceRewardEnv(MultiAgentF110):
 
         L = float(self.env.track.centerline.spline.s[-1])
 
-        # Progress: monotonic arc-length delta (with lap wrap).
+        # Progress: monotonic arc-length delta, handling BOTH finish-line wraps.
+        # A forward crossing shows s jump ~L -> ~0 (large negative delta); a backward
+        # crossing shows s jump ~0 -> ~L (large positive delta). Both must be undone
+        # before clamping, otherwise driving backward across the line scores ~L of
+        # bogus progress and back-and-forth oscillation farms the reward.
         cur_s = self._arclen(i)
         d = cur_s - self._prev_s[i]
-        if d < -0.5 * L:
+        if d > 0.5 * L:
+            d -= L
+        elif d < -0.5 * L:
             d += L
         d = max(0.0, d)
-        self._cum_s[i] += d
         self._prev_s[i] = cur_s
         progress_reward = self.PROGRESS_SCALE * d
 
@@ -732,12 +749,18 @@ class RacePerformanceRewardEnv(MultiAgentF110):
         else:
             speed_reward = -self.STALL_PENALTY
 
-        # Overtake: event bonus when moving from behind to ahead of another agent.
+        # Overtake: event bonus when this agent passes another in ABSOLUTE race
+        # position (laps*L + arc-length), not distance travelled. All positions are read
+        # from the current, already-stepped sim state, so every pair is compared at the
+        # same timestep regardless of the sequential per-agent reward loop; the ahead
+        # matrix was seeded from the grid start positions at reset, so no bonus fires
+        # until a real pass happens.
+        pos_i = self._abs_pos(i, L)
         overtake_reward = 0.0
         for j in range(self.env.num_agents):
             if j == i:
                 continue
-            ahead = self._cum_s[i] > self._cum_s[j]
+            ahead = pos_i > self._abs_pos(j, L)
             if ahead and not self._prev_ahead[i][j]:
                 overtake_reward += self.OVERTAKE_BONUS
             self._prev_ahead[i][j] = ahead
