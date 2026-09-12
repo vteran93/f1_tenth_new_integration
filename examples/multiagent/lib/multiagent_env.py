@@ -43,6 +43,12 @@ class MultiAgentF110(MultiAgentEnv, ABC):
         per RL step, so progress terms naturally sum over the repeat. Default 1.
     min_speed / max_speed : float
         Clip applied to the speed command (action index 1) before it reaches the simulator.
+    speed_action_range : [lo, hi]
+        Bounds of the speed component of the *agent's action space* (default: the vehicle's
+        v_min/v_max, i.e. [-5, 20]). With ``normalize_actions`` the policy's [-1, 1] output is
+        mapped onto this range, so a range like [0.5, 8] removes the reverse/zero dead zone and
+        the unreachable 8-20 m/s band that otherwise swallow ~70 % of the action range (the
+        policy mean then crawls while exploration noise clipped at the caps fakes speed).
     episode_timeout : dict
         ``{"steps": N}`` or ``{"laps": L, "ref_speed": v}`` (time to drive L laps at v m/s).
         When reached the episode is truncated for all agents. Default: no time limit.
@@ -72,6 +78,7 @@ class MultiAgentF110(MultiAgentEnv, ABC):
         self.action_repeat = max(1, int(env_config.get("action_repeat", 1)))
         self._min_speed = env_config.get("min_speed")
         self._max_speed = env_config.get("max_speed")
+        self._speed_action_range = env_config.get("speed_action_range")
         self._timeout_cfg = env_config.get("episode_timeout")
         self._max_episode_steps = None
         self._episode_steps = 0
@@ -389,8 +396,11 @@ class MultiAgentF110(MultiAgentEnv, ABC):
         multi_action_space = self.env.action_space
         if not isinstance(multi_action_space, gym.spaces.Box):
             raise ValueError(f"Expected Box action space, got {type(multi_action_space)}")
-        single_low = multi_action_space.low[0]
-        single_high = multi_action_space.high[0]
+        single_low = np.array(multi_action_space.low[0], dtype=np.float32, copy=True)
+        single_high = np.array(multi_action_space.high[0], dtype=np.float32, copy=True)
+        if getattr(self, "_speed_action_range", None):
+            lo, hi = self._speed_action_range
+            single_low[1], single_high[1] = np.float32(lo), np.float32(hi)
         return gym.spaces.Box(low=single_low, high=single_high, shape=single_low.shape, dtype=np.float32)
 
     def _make_single_agent_obs_space(self):

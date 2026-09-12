@@ -84,3 +84,24 @@ def test_curriculum_env_stage_sampling_and_progress():
         done = term["__all__"] or trunc["__all__"]
     assert steps <= 30
     assert env.env.sim.agents[0].state[3] <= 8.0 + 1e-3
+
+
+@pytest.mark.skipif(not MANIFEST.exists(), reason="generate maps first")
+def test_speed_action_range_rescales_action_space():
+    from examples.multiagent.lib.rewards import ProgressTimePenaltyEnv
+
+    env_config = dict(
+        map="kata_01_taikyoku_shodan_01", num_agents=2, timestep=0.01, num_beams=36, integrator="rk4",
+        control_input=["speed", "steering_angle"], observation_config={"type": "original"},
+        reset_config={"type": "cl_grid_static"}, action_repeat=5, speed_action_range=[0.5, 8.0],
+        max_speed=5.0, episode_timeout={"steps": 20},
+    )
+    env = ProgressTimePenaltyEnv(env_config=env_config)
+    assert env.action_space.low[1] == pytest.approx(0.5) and env.action_space.high[1] == pytest.approx(8.0)
+    assert env.action_space.low[0] == pytest.approx(-0.4189, abs=1e-3)  # steering untouched
+    obs, _ = env.reset()
+    for _ in range(20):
+        obs, _, term, trunc, _ = env.step({a: env.action_space.high for a in obs})
+        if term["__all__"] or trunc["__all__"]:
+            break
+    assert env.env.sim.agents[0].state[3] <= 5.0 + 1e-3  # stage/max_speed cap still applies

@@ -12,7 +12,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 PY=../../venv/bin/python
 CFG=configs/experiments_kata.yaml
-EXPS=(kata_PPO_shared_ProgressTimePenalty kata_SAC_shared_ProgressTimePenalty)
+# Override with e.g.: KATA_EXPS="kata_v2_PPO_shared_ProgressTimePenalty kata_v2_SAC_shared_ProgressTimePenalty" ./run_kata_overnight.sh start
+read -r -a EXPS <<< "${KATA_EXPS:-kata_PPO_shared_ProgressTimePenalty kata_SAC_shared_ProgressTimePenalty}"
 mkdir -p logs
 
 status() {

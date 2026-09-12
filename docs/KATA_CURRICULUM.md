@@ -124,3 +124,76 @@ métrica de promoción), `custom_metrics/average_speed_mean`, `evaluation/.../la
   `Track` por env, ~2 MB cada una).
 * El contador de vueltas nativo de `F110Env` (`lap_counts`) sigue funcionando pero la métrica
   de promoción usa el progreso monótono del wrapper, que no depende de la puerta de salida.
+
+## 6. Resultados de la primera noche (2026-09-11 → 12) y correcciones v2
+
+Config: `experiments_kata.yaml`, PPO y SAC concurrentes (5 runners × 2 envs cada uno).
+Curvas: `docs/kata_overnight_20260912_curves.png`. Evaluación por pista del checkpoint final de
+PPO (determinista, sin tope de velocidad, 2 episodios × 2 agentes por pista):
+`docs/kata_eval_20260912_ppo_final.csv` (script `examples/multiagent/kata_eval_tracks.py`).
+
+| | PPO | SAC |
+|---|---|---|
+| Pasos de RL en la noche | 3.0 M (2.5 h, ~340 pasos/s) | 0.58 M (8.1 h, ~20 pasos/s) |
+| Etapa alcanzada | 10 (Bassai Dai), 8 de 9 promociones por presupuesto | 5, todas por presupuesto |
+| Éxito de vuelta, evaluación reservada (final) | **0.57–0.60**, 2.7–2.8 vueltas/episodio | 0.00 (congelado desde ~0.4 M pasos) |
+
+Éxito por pista reservada, PPO final (fracción de agente-episodios con ≥ 1 vuelta; velocidad
+media; tiempo de la primera vuelta):
+
+| Kata | Éxito | Vueltas | Vel. (m/s) | 1ª vuelta (s) | Nota |
+|---|---|---|---|---|---|
+| 01 Taikyoku Shodan | 1.00 | 8.6 | 6.4 | 8.9 | sin choques, 59 m |
+| 02 Taikyoku Nidan | 0.75 | 4.2 | 4.1 | 16.6 | |
+| 03 Taikyoku Sandan | 1.00 | 5.0 | 3.5 | 17.3 | sin choques |
+| 04 Heian Shodan | 1.00 | 2.3 | 3.9 | 25.7 | choca tras 2 vueltas |
+| 05 Heian Nidan | 1.00 | 4.5 | 3.1 | 19.5 | sin choques |
+| 06 Heian Sandan | 1.00 | 1.7 | 3.1 | 27.6 | choca tras 1–2 vueltas |
+| 07 Heian Yondan | 0.00 | 0.1 | 0.1 | – | se para ante la horquilla |
+| 08 Heian Godan | 0.00 | 0.4 | 0.7 | – | se para / choca |
+| 09 Tekki Shodan | 0.00 | 0.3 | 0.8 | – | choca en el eslalon estrecho |
+| 10 Bassai Dai | 0.00 | 0.2 | 4.0 | – | choca rápido |
+
+El checkpoint de la época Taikyoku (iter 50) iba a 7–10 m/s y chocaba en todas (éxito 0.03):
+el currículum convirtió "rápido y choca" en "vuelta tras vuelta a 3–6 m/s" en las seis
+primeras katas. Las cuatro últimas (horquillas, pasillo estrecho, circuito aleatorio) no se
+aprendieron: la política se detiene ante la horquilla en vez de tomarla.
+
+### Diagnóstico
+
+1. **Espacio de acción de velocidad.** El agente actúa sobre el rango del vehículo,
+   [−5, 20] m/s. Con `normalize_actions`, la salida de la política en [−1, 1] se mapea a ese
+   rango, pero solo [0, 8] es útil: ~70 % del rango es zona muerta (≤ 0 → parado) o
+   inalcanzable (> tope de etapa). Consecuencias medidas: en PPO la media de la política se
+   arrastra mientras el ruido de exploración recortado por los topes finge velocidad (a la
+   iteración 50 la velocidad estocástica era 3.7 m/s y la determinista 7–10 m/s) y la entropía
+   sube de 2.0 a 3.9 nats; en SAC la gaussiana comprimida cae en la zona muerta, `alpha`
+   colapsa a 5·10⁻⁴ y la política se congela (`mean_q` ≈ −12, el valor de estar parado).
+2. **Presupuesto por etapa.** 200k pasos no bastaron desde la etapa 3: 8 de 9 promociones
+   fueron por presupuesto, así que las katas 7–10 se vieron con éxito de entrenamiento ≈ 0.05
+   y sin señal útil.
+3. **Rendimiento de SAC.** ~1 paso de gradiente por segundo con el buffer priorizado de 1 M
+   (`num_agent_steps_trained` 14.7 M frente a 1.16 M muestreados): 20 pasos de entorno/s.
+
+### Cambios v2 (`kata_v2_*` en `experiments_kata.yaml`)
+
+* `speed_action_range: [0.5, 8.0]` en el wrapper: el espacio de acción del agente pasa a ser
+  [0.5, 8] m/s (los topes de etapa siguen recortando por encima). El suelo de 0.5 m/s elimina
+  "quedarse parado" como política.
+* PPO: `free_log_std: true` (desviación independiente del estado), presupuesto de etapa
+  400k, 5 M pasos en total.
+* SAC: `MultiAgentReplayBuffer` uniforme de 500k, `training_intensity: 32`, 3 M pasos.
+
+Lanzar la segunda noche:
+
+```bash
+cd examples/multiagent && KATA_EXPS="kata_v2_PPO_shared_ProgressTimePenalty kata_v2_SAC_shared_ProgressTimePenalty" ./run_kata_overnight.sh start
+```
+
+### Nota sobre evaluación externa de checkpoints
+
+En Ray 2.46 `Policy.compute_single_action` devuelve la acción **normalizada** en [−1, 1]; la
+desnormalización a unidades del entorno la hace el `RolloutWorker`. Cualquier evaluador que
+cargue solo la `Policy` debe aplicar `unsquash_action(a, policy.action_space_struct)`
+(`kata_eval_tracks.py` lo hace); sin ello el coche "se arrastra" a ≤ 1 m/s y los resultados
+son falsos.

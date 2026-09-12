@@ -145,6 +145,78 @@ experiments:
     sac_params:
       <<: *sac_params
 
+  # ─────────────────────────────────────────────────────────────────────────────
+  # v2 (2026-09-12): fixes from the first overnight run, see docs/KATA_CURRICULUM.md §6
+  #  * speed_action_range [0.5, 8]: the vehicle's raw [-5, 20] m/s range left ~70 % of the
+  #    normalized action space in a dead zone (<=0 -> stopped) or unreachable (> cap). PPO's
+  #    mean crawled while clipped exploration noise faked speed; SAC's squashed Gaussian
+  #    sat in the dead zone and froze (alpha -> 0). A 0.5 m/s floor also removes "freeze"
+  #    as a policy.
+  #  * PPO: free_log_std (state-independent std; entropy exploded to 3.9 nats with the
+  #    state-dependent one), 400k-step stage budget (200k was hit on every stage >= 2).
+  #  * SAC: uniform replay buffer + explicit training_intensity. The prioritized 1M buffer
+  #    ran the learner at ~1 gradient step/s (20 env steps/s => 580k steps in 8 h).
+  - name: kata_v2_PPO_shared_ProgressTimePenalty
+    storage_path: ../models_kata
+    nan_protection: true
+    training:
+      algorithm:       PPO
+      shared_policy:   true
+      reward_function: ProgressTimePenaltyEnv
+      timesteps_total: 5_000_000
+      eval_interval:   25
+      plateau_stop:    false
+    evaluation:
+      episodes: 10
+      explore:  false
+      env:
+        <<: *eval_env
+        speed_action_range: [0.5, 8.0]
+    env:
+      <<: *env
+      speed_action_range: [0.5, 8.0]
+      curriculum:
+        manifest: maps/kata_curriculum.yaml
+        stage: 0
+        mix_prev: 0.25
+        use_stage_speed: true
+        promotion: { metric: lap_success_mean, success_threshold: 0.8, streak: 3, min_steps: 60_000, max_steps: 400_000 }
+    ppo_params:
+      <<: *ppo_params
+      model:
+        fcnet_hiddens:    [256, 256]
+        fcnet_activation: tanh
+        free_log_std:     true
+
+  - name: kata_v2_SAC_shared_ProgressTimePenalty
+    storage_path: ../models_kata
+    training:
+      algorithm:       SAC
+      shared_policy:   true
+      reward_function: ProgressTimePenaltyEnv
+      timesteps_total: 3_000_000
+      eval_interval:   25
+      plateau_stop:    false
+    evaluation:
+      episodes: 10
+      explore:  false
+      env:
+        <<: *eval_env
+        speed_action_range: [0.5, 8.0]
+    env:
+      <<: *env
+      speed_action_range: [0.5, 8.0]
+      curriculum:
+        manifest: maps/kata_curriculum.yaml
+        stage: 0
+        mix_prev: 0.25
+        use_stage_speed: true
+        promotion: { metric: lap_success_mean, success_threshold: 0.8, streak: 3, min_steps: 60_000, max_steps: 400_000 }
+    sac_params:
+      <<: *sac_params
+      training_intensity:    32          # ~1 gradient step (batch 256) per 8 env steps (default was 25.6 -> ~1 per 10 but on a prioritized buffer)
+      replay_buffer_config:  { type: MultiAgentReplayBuffer, capacity: 500000 }
+
   # Tiny smoke test: 2 runners, promotion by budget every 2k steps, eval every 2 iterations.
   - name: kata_SMOKE_PPO
     storage_path: ../models_kata_smoke
