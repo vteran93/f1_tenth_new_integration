@@ -125,9 +125,14 @@ class RaceCar(object):
         self.ttc_thresh = 0.005
 
         # initialize scan sim
+        # Beam-angle tables are shared at class level (they only depend on num_beams/fov),
+        # but every RaceCar owns its OWN ScanSimulator2D. The previous class-level
+        # simulator meant all envs in one process silently shared a single map, which
+        # breaks vectorised env runners that hold envs on different tracks (curriculum).
+        self.scan_rng = np.random.default_rng(seed=self.seed)
+        self.scan_simulator = ScanSimulator2D(num_beams, fov)
         if RaceCar.scan_simulator is None:
-            self.scan_rng = np.random.default_rng(seed=self.seed)
-            RaceCar.scan_simulator = ScanSimulator2D(num_beams, fov)
+            RaceCar.scan_simulator = self.scan_simulator
 
             scan_ang_incr = RaceCar.scan_simulator.get_increment()
 
@@ -188,7 +193,7 @@ class RaceCar(object):
             map (str | Track): name of the map, or Track object
             map_scale (float, default=1.0): scale of the map, larger scale means larger map
         """
-        RaceCar.scan_simulator.set_map(map, map_scale)
+        self.scan_simulator.set_map(map, map_scale)
 
     def reset(self, pose):
         """
@@ -316,7 +321,7 @@ class RaceCar(object):
         self.state[4] %= 2 * np.pi  # TODO: This is a problem waiting to happen
 
         # update scan
-        current_scan = RaceCar.scan_simulator.scan(
+        current_scan = self.scan_simulator.scan(
             np.append(self.state[0:2], self.state[4]), self.scan_rng
         )
 

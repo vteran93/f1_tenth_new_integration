@@ -76,19 +76,24 @@ class ProgressTimePenaltyEnv(MultiAgentF110):
     """
     TIME_PENALTY = 0.02    # reward subtracted every step -> punishes slowness
     CRASH_PENALTY = 50.0   # large one-off terminal penalty on collision
+    PROGRESS_SCALE = 1.0   # reward per metre of forward progress
 
     def __init__(self, env_config=None):
         super().__init__(env_config=env_config)
+        # Optional overrides via env_config["reward_params"]. Defaults keep the historical
+        # constants. With action_repeat > 1 the per-step progress grows proportionally, so
+        # time_penalty / crash_penalty must be re-scaled (see configs/experiments_kata.yaml).
+        rp = (env_config or {}).get("reward_params") or {}
+        self.TIME_PENALTY = float(rp.get("time_penalty", self.TIME_PENALTY))
+        self.CRASH_PENALTY = float(rp.get("crash_penalty", self.CRASH_PENALTY))
+        self.PROGRESS_SCALE = float(rp.get("progress_scale", self.PROGRESS_SCALE))
 
     def reset(self, *, seed=None, options=None):
         obs, info = super().reset(seed=seed, options=options)
         # Seed the progress tracker with the actual starting arc-length, so the first
         # step does not score a spurious jump from s=0 to the start position.
         for i in range(self.env.num_agents):
-            s0, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
-                self.env.poses_x[i].item(), self.env.poses_y[i].item()
-            )
-            self._last_s[i] = s0
+            self._last_s[i] = self.arclength(self.env.poses_x[i], self.env.poses_y[i])
         return obs, info
 
     def _compute_reward(self, agent, newly_crashed, i):
@@ -100,26 +105,15 @@ class ProgressTimePenaltyEnv(MultiAgentF110):
         if agent in newly_crashed:
             return -self.CRASH_PENALTY
 
-        # Forward progress along the centerline since last step.
-        current_s, _ = self.env.track.centerline.spline.calc_arclength_inaccurate(
-            self.env.poses_x[i].item(), self.env.poses_y[i].item()
-        )
-        track_len = self.env.track.centerline.spline.s[-1]
-        prog = current_s - self._last_s[i]
-
-        # Lap wrap in BOTH directions: forward crossing shows s jump ~track_len -> ~0
-        # (large negative); backward crossing shows ~0 -> ~track_len (large positive) and
-        # must be undone too, else driving backward across the line farms ~track_len.
-        if prog > 0.5 * track_len:
-            prog -= track_len
-        elif prog < -0.5 * track_len:
-            prog += track_len
-
-        # Monotonic: no reward for moving backward (kills finish-line farming).
-        prog = max(0.0, prog)
+        # Forward progress along the centerline since last step. The projection is
+        # windowed around the previous arc-length (no flips between hairpin legs) and the
+        # delta is wrap-aware in both directions, clipped to be non-negative (no
+        # finish-line farming) and bounded by the physically possible step progress.
+        current_s = self.arclength(self.env.poses_x[i], self.env.poses_y[i], self._last_s[i])
+        prog = self.progress_delta(current_s, self._last_s[i])
 
         self._last_s[i] = current_s
-        return prog - self.TIME_PENALTY
+        return self.PROGRESS_SCALE * prog - self.TIME_PENALTY
 
 
 class ProgressRewardAdvancedEnv(MultiAgentF110):

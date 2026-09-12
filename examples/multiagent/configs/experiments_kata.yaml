@@ -1,0 +1,175 @@
+# Kata curriculum experiments: PPO vs SAC, shared policy, 2 agents, 100 generated tracks
+# ordered by difficulty (see training_tracks/kata_trackgen.py and docs/KATA_CURRICULUM.md).
+#
+# Both experiments share EVERYTHING except the algorithm block (same env, same reward, same
+# curriculum schedule, same held-out eval tracks) so the comparison is not confounded.
+#
+# Run (one process per algorithm so they train concurrently):
+#   cd examples/multiagent
+#   ../../venv/bin/python run.py --config configs/experiments_kata.yaml train --experiment kata_PPO_shared_ProgressTimePenalty
+#   ../../venv/bin/python run.py --config configs/experiments_kata.yaml train --experiment kata_SAC_shared_ProgressTimePenalty
+# or ./run_kata_overnight.sh
+
+num_cpus: 7                  # per process (two processes share the 14-core box)
+num_env_runners: 5
+num_envs_per_env_runner: 2   # safe now that ScanSimulator2D is per-RaceCar (different maps per process)
+
+env: &env
+  map:               kata_01_taikyoku_shodan_01   # initial map; the curriculum swaps it at every reset
+  num_agents:        2
+  timestep:          0.01
+  num_beams:         36
+  integrator:        rk4
+  control_input:     [speed, steering_angle]
+  observation_config: { type: original }
+  reset_config:       { type: cl_random_static }  # random start along the track -> covers the whole lap
+  render_mode:        null
+  # --- wrapper options (lib/multiagent_env.py) ---
+  action_repeat:      5        # 20 Hz control on a 100 Hz sim: 5x longer effective horizon
+  min_speed:          0.0      # no reverse driving
+  episode_timeout:    { laps: 2, ref_speed: 1.5 }   # time to do 2 laps at 1.5 m/s, then truncate
+  reward_params:               # ProgressTimePenaltyEnv, re-scaled for 0.05 s steps:
+    progress_scale: 1.0        #   +1 per metre of monotonic forward progress
+    time_penalty:   0.1        #   net positive above 2 m/s; freezing costs -0.1/step
+    crash_penalty:  20.0       #   terminal; ~ value of 5 s of fast driving under gamma 0.99
+  curriculum:
+    manifest:   maps/kata_curriculum.yaml
+    stage:      0
+    mix_prev:   0.25           # 25% of episodes replay an earlier stage (anti-forgetting)
+    use_stage_speed: true      # stage speed caps from the manifest: 5,5,6,6,7,7,8,8,8,8 m/s
+    promotion:                 # overridden per algorithm below
+      metric: lap_success_mean
+      success_threshold: 0.8
+      streak: 3
+
+# Fixed held-out evaluation set: the 10 "e1" tracks (one per stage), never used for training.
+eval_env: &eval_env
+  <<: *env
+  reset_config: { type: cl_grid_static }
+  curriculum:
+    manifest: maps/kata_curriculum.yaml
+    use_stage_speed: false
+    eval_tracks:
+      - kata_01_taikyoku_shodan_e1
+      - kata_02_taikyoku_nidan_e1
+      - kata_03_taikyoku_sandan_e1
+      - kata_04_heian_shodan_e1
+      - kata_05_heian_nidan_e1
+      - kata_06_heian_sandan_e1
+      - kata_07_heian_yondan_e1
+      - kata_08_heian_godan_e1
+      - kata_09_tekki_shodan_e1
+      - kata_10_bassai_dai_e1
+
+ppo_params: &ppo_params
+  gamma:            0.99        # 100 RL steps = 5 s horizon (was 0.9787 at 100 Hz = 0.47 s)
+  lambda_:          0.95
+  lr:               0.0003
+  train_batch_size: 4000
+  minibatch_size:   500
+  num_epochs:       10
+  clip_param:       0.2
+  vf_clip_param:    10.0
+  grad_clip:        0.5
+  entropy_coeff:    0.0
+  model:
+    fcnet_hiddens:    [256, 256]
+    fcnet_activation: tanh
+  environment:      { normalize_actions: true }
+
+sac_params: &sac_params
+  gamma:                 0.99
+  lr:                    0.0003
+  tau:                   0.005
+  train_batch_size:      256
+  n_step:                1
+  twin_q:                true
+  target_entropy:        auto
+  num_steps_sampled_before_learning_starts: 5000
+  model:                 { fcnet_hiddens: [256, 256] }
+  q_model_config:        { fcnet_hiddens: [256, 256] }
+  policy_model_config:   { fcnet_hiddens: [256, 256] }
+  replay_buffer_config:  { type: MultiAgentPrioritizedReplayBuffer, capacity: 1000000 }
+  reporting:             { min_sample_timesteps_per_iteration: 4000 }   # 1 iteration ~ 1 PPO batch
+  environment:           { normalize_actions: true }
+
+experiments:
+  - name: kata_PPO_shared_ProgressTimePenalty
+    storage_path: ../models_kata
+    nan_protection: true
+    training:
+      algorithm:       PPO
+      shared_policy:   true
+      reward_function: ProgressTimePenaltyEnv
+      timesteps_total: 3_000_000
+      eval_interval:   25          # iterations (= 100k steps)
+      plateau_stop:    false
+    evaluation:
+      episodes: 10
+      explore:  false
+      env:
+        <<: *eval_env
+    env:
+      <<: *env
+      curriculum:
+        manifest: maps/kata_curriculum.yaml
+        stage: 0
+        mix_prev: 0.25
+        use_stage_speed: true
+        promotion: { metric: lap_success_mean, success_threshold: 0.8, streak: 3, min_steps: 60_000, max_steps: 200_000 }
+    ppo_params:
+      <<: *ppo_params
+
+  - name: kata_SAC_shared_ProgressTimePenalty
+    storage_path: ../models_kata
+    training:
+      algorithm:       SAC
+      shared_policy:   true
+      reward_function: ProgressTimePenaltyEnv
+      timesteps_total: 2_000_000
+      eval_interval:   25          # iterations of >=4000 steps (= 100k steps)
+      plateau_stop:    false
+    evaluation:
+      episodes: 10
+      explore:  false
+      env:
+        <<: *eval_env
+    env:
+      <<: *env
+      curriculum:
+        manifest: maps/kata_curriculum.yaml
+        stage: 0
+        mix_prev: 0.25
+        use_stage_speed: true
+        promotion: { metric: lap_success_mean, success_threshold: 0.8, streak: 3, min_steps: 30_000, max_steps: 120_000 }
+    sac_params:
+      <<: *sac_params
+
+  # Tiny smoke test: 2 runners, promotion by budget every 2k steps, eval every 2 iterations.
+  - name: kata_SMOKE_PPO
+    storage_path: ../models_kata_smoke
+    training:
+      algorithm:       PPO
+      shared_policy:   true
+      reward_function: ProgressTimePenaltyEnv
+      timesteps_total: 12_000
+      eval_interval:   2
+      plateau_stop:    false
+    evaluation:
+      episodes: 2
+      explore:  false
+      env:
+        <<: *eval_env
+    env:
+      <<: *env
+      curriculum:
+        manifest: maps/kata_curriculum.yaml
+        stage: 0
+        mix_prev: 0.25
+        use_stage_speed: true
+        promotion: { metric: lap_success_mean, success_threshold: 0.8, streak: 3, min_steps: 1000, max_steps: 2000 }
+    ppo_params:
+      <<: *ppo_params
+      train_batch_size: 1000
+      minibatch_size:   250
+      num_epochs:       2

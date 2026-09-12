@@ -1,0 +1,6 @@
+image: kata_10_bassai_dai_09_map.png
+resolution: 0.050000
+origin: [-32.254464, -29.387729, 0.000000]
+negate: 0
+occupied_thresh: 0.45
+free_thresh: 0.196

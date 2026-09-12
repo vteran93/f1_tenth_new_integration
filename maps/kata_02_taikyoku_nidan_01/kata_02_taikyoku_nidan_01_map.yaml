@@ -1,0 +1,6 @@
+image: kata_02_taikyoku_nidan_01_map.png
+resolution: 0.050000
+origin: [-21.788302, -11.218352, 0.000000]
+negate: 0
+occupied_thresh: 0.45
+free_thresh: 0.196

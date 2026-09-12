@@ -1,0 +1,6 @@
+image: kata_09_tekki_shodan_01_map.png
+resolution: 0.050000
+origin: [-34.063145, -8.580545, 0.000000]
+negate: 0
+occupied_thresh: 0.45
+free_thresh: 0.196

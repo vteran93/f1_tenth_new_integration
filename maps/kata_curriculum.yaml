@@ -1,0 +1,2488 @@
+generator: training_tracks/kata_trackgen.py
+seed: 2026
+resolution_m_per_px: 0.05
+wall_margin_m: 0.6
+difficulty_index: 0.35*min(1,2/rmin) + 0.25*min(1,2.2/width) + 0.25*min(1,turn_integral/(2pi)/6)
+  + 0.15*min(1,dir_changes/12)
+stages:
+- stage: 1
+  kata: Taikyoku Shodan
+  slug: taikyoku_shodan
+  family: stadium
+  competence: acelerar, mantener carril, una curva suave (un solo sentido de giro)
+  width_m:
+  - 4.0
+  - 4.4
+  rmin_m:
+  - 6.0
+  - 9.0
+  length_m:
+  - 55
+  - 80
+  max_speed: 5.0
+  train_tracks:
+  - name: kata_01_taikyoku_shodan_01
+    seed: 202700
+    attempts: 1
+    length_m: 57.0
+    width_m: 4.39
+    min_radius_m: 6.14
+    mean_abs_curvature: 0.1103
+    turn_integral_rad: 6.26
+    straight_fraction: 0.233
+    direction_changes: 0
+    bbox_m:
+    - 20.3
+    - 13.5
+    difficulty_index: 0.281
+    image_px:
+    - 574
+    - 437
+    origin:
+    - -14.348
+    - -10.925
+    n_waypoints: 113
+  - name: kata_01_taikyoku_shodan_02
+    seed: 202701
+    attempts: 1
+    length_m: 70.0
+    width_m: 4.03
+    min_radius_m: 6.66
+    mean_abs_curvature: 0.0898
+    turn_integral_rad: 6.26
+    straight_fraction: 0.362
+    direction_changes: 0
+    bbox_m:
+    - 27.3
+    - 13.4
+    difficulty_index: 0.283
+    image_px:
+    - 707
+    - 430
+    origin:
+    - -17.657
+    - -10.731
+    n_waypoints: 139
+  - name: kata_01_taikyoku_shodan_03
+    seed: 202702
+    attempts: 1
+    length_m: 62.0
+    width_m: 4.25
+    min_radius_m: 7.33
+    mean_abs_curvature: 0.1014
+    turn_integral_rad: 6.26
+    straight_fraction: 0.166
+    direction_changes: 0
+    bbox_m:
+    - 21.0
+    - 16.3
+    difficulty_index: 0.266
+    image_px:
+    - 586
+    - 491
+    origin:
+    - -14.631
+    - -12.267
+    n_waypoints: 123
+  - name: kata_01_taikyoku_shodan_04
+    seed: 202703
+    attempts: 1
+    length_m: 55.0
+    width_m: 4.33
+    min_radius_m: 6.83
+    mean_abs_curvature: 0.1143
+    turn_integral_rad: 6.26
+    straight_fraction: 0.123
+    direction_changes: 0
+    bbox_m:
+    - 17.7
+    - 15.7
+    difficulty_index: 0.271
+    image_px:
+    - 521
+    - 480
+    origin:
+    - -13.008
+    - -11.999
+    n_waypoints: 109
+  - name: kata_01_taikyoku_shodan_05
+    seed: 202704
+    attempts: 1
+    length_m: 65.0
+    width_m: 4.01
+    min_radius_m: 8.44
+    mean_abs_curvature: 0.0967
+    turn_integral_rad: 6.26
+    straight_fraction: 0.131
+    direction_changes: 0
+    bbox_m:
+    - 22.3
+    - 17.5
+    difficulty_index: 0.262
+    image_px:
+    - 606
+    - 510
+    origin:
+    - -15.141
+    - -12.743
+    n_waypoints: 129
+  - name: kata_01_taikyoku_shodan_06
+    seed: 202705
+    attempts: 1
+    length_m: 56.0
+    width_m: 4.14
+    min_radius_m: 6.49
+    mean_abs_curvature: 0.1122
+    turn_integral_rad: 6.26
+    straight_fraction: 0.17
+    direction_changes: 0
+    bbox_m:
+    - 19.1
+    - 14.5
+    difficulty_index: 0.282
+    image_px:
+    - 545
+    - 453
+    origin:
+    - -13.612
+    - -11.319
+    n_waypoints: 111
+  - name: kata_01_taikyoku_shodan_07
+    seed: 202706
+    attempts: 1
+    length_m: 78.0
+    width_m: 4.35
+    min_radius_m: 7.99
+    mean_abs_curvature: 0.0806
+    turn_integral_rad: 6.26
+    straight_fraction: 0.296
+    direction_changes: 0
+    bbox_m:
+    - 27.9
+    - 17.9
+    difficulty_index: 0.256
+    image_px:
+    - 726
+    - 526
+    origin:
+    - -18.143
+    - -13.137
+    n_waypoints: 155
+  - name: kata_01_taikyoku_shodan_08
+    seed: 202707
+    attempts: 1
+    length_m: 60.0
+    width_m: 4.25
+    min_radius_m: 6.66
+    mean_abs_curvature: 0.1048
+    turn_integral_rad: 6.26
+    straight_fraction: 0.222
+    direction_changes: 0
+    bbox_m:
+    - 21.3
+    - 14.4
+    difficulty_index: 0.276
+    image_px:
+    - 591
+    - 454
+    origin:
+    - -14.767
+    - -11.342
+    n_waypoints: 119
+  - name: kata_01_taikyoku_shodan_09
+    seed: 202708
+    attempts: 1
+    length_m: 74.0
+    width_m: 4.26
+    min_radius_m: 8.09
+    mean_abs_curvature: 0.0849
+    turn_integral_rad: 6.26
+    straight_fraction: 0.275
+    direction_changes: 0
+    bbox_m:
+    - 27.4
+    - 16.5
+    difficulty_index: 0.257
+    image_px:
+    - 714
+    - 496
+    origin:
+    - -17.849
+    - -12.39
+    n_waypoints: 147
+  - name: kata_01_taikyoku_shodan_10
+    seed: 202709
+    attempts: 1
+    length_m: 60.0
+    width_m: 4.34
+    min_radius_m: 7.48
+    mean_abs_curvature: 0.1048
+    turn_integral_rad: 6.26
+    straight_fraction: 0.138
+    direction_changes: 0
+    bbox_m:
+    - 18.8
+    - 17.6
+    difficulty_index: 0.262
+    image_px:
+    - 544
+    - 519
+    origin:
+    - -13.581
+    - -12.973
+    n_waypoints: 119
+  eval_tracks:
+  - name: kata_01_taikyoku_shodan_e1
+    seed: 202750
+    attempts: 1
+    length_m: 59.0
+    width_m: 4.24
+    min_radius_m: 8.25
+    mean_abs_curvature: 0.1065
+    turn_integral_rad: 6.26
+    straight_fraction: 0.077
+    direction_changes: 0
+    bbox_m:
+    - 19.9
+    - 16.7
+    difficulty_index: 0.256
+    image_px:
+    - 564
+    - 499
+    origin:
+    - -14.08
+    - -12.452
+    n_waypoints: 117
+- stage: 2
+  kata: Taikyoku Nidan
+  slug: taikyoku_nidan
+  family: stadium_s
+  competence: 'primer cambio de sentido: una S suave en la recta'
+  width_m:
+  - 3.8
+  - 4.2
+  rmin_m:
+  - 4.5
+  - 6.0
+  length_m:
+  - 70
+  - 100
+  max_speed: 5.0
+  train_tracks:
+  - name: kata_02_taikyoku_nidan_01
+    seed: 202800
+    attempts: 2
+    length_m: 84.0
+    width_m: 4.12
+    min_radius_m: 5.48
+    mean_abs_curvature: 0.0941
+    turn_integral_rad: 7.88
+    straight_fraction: 0.355
+    direction_changes: 4
+    bbox_m:
+    - 35.4
+    - 12.8
+    difficulty_index: 0.363
+    image_px:
+    - 872
+    - 420
+    origin:
+    - -21.788
+    - -11.218
+    n_waypoints: 167
+  - name: kata_02_taikyoku_nidan_02
+    seed: 202801
+    attempts: 1
+    length_m: 97.0
+    width_m: 3.9
+    min_radius_m: 4.56
+    mean_abs_curvature: 0.0806
+    turn_integral_rad: 7.79
+    straight_fraction: 0.496
+    direction_changes: 4
+    bbox_m:
+    - 42.7
+    - 11.2
+    difficulty_index: 0.396
+    image_px:
+    - 1013
+    - 383
+    origin:
+    - -25.331
+    - -10.291
+    n_waypoints: 193
+  - name: kata_02_taikyoku_nidan_03
+    seed: 202802
+    attempts: 5
+    length_m: 94.0
+    width_m: 4.01
+    min_radius_m: 5.9
+    mean_abs_curvature: 0.0899
+    turn_integral_rad: 8.43
+    straight_fraction: 0.373
+    direction_changes: 4
+    bbox_m:
+    - 39.7
+    - 14.7
+    difficulty_index: 0.362
+    image_px:
+    - 954
+    - 454
+    origin:
+    - -23.838
+    - -12.42
+    n_waypoints: 187
+  - name: kata_02_taikyoku_nidan_04
+    seed: 202803
+    attempts: 1
+    length_m: 85.99
+    width_m: 4.16
+    min_radius_m: 5.21
+    mean_abs_curvature: 0.0923
+    turn_integral_rad: 7.92
+    straight_fraction: 0.373
+    direction_changes: 4
+    bbox_m:
+    - 36.1
+    - 13.1
+    difficulty_index: 0.369
+    image_px:
+    - 885
+    - 425
+    origin:
+    - -22.095
+    - -11.413
+    n_waypoints: 171
+  - name: kata_02_taikyoku_nidan_05
+    seed: 202804
+    attempts: 2
+    length_m: 92.0
+    width_m: 3.9
+    min_radius_m: 6.01
+    mean_abs_curvature: 0.0822
+    turn_integral_rad: 7.54
+    straight_fraction: 0.395
+    direction_changes: 4
+    bbox_m:
+    - 38.9
+    - 13.5
+    difficulty_index: 0.357
+    image_px:
+    - 937
+    - 428
+    origin:
+    - -23.43
+    - -11.29
+    n_waypoints: 183
+  - name: kata_02_taikyoku_nidan_06
+    seed: 202805
+    attempts: 1
+    length_m: 99.0
+    width_m: 3.95
+    min_radius_m: 5.23
+    mean_abs_curvature: 0.0829
+    turn_integral_rad: 8.18
+    straight_fraction: 0.446
+    direction_changes: 4
+    bbox_m:
+    - 42.7
+    - 13.3
+    difficulty_index: 0.377
+    image_px:
+    - 1013
+    - 426
+    origin:
+    - -25.298
+    - -11.61
+    n_waypoints: 197
+  - name: kata_02_taikyoku_nidan_07
+    seed: 202806
+    attempts: 2
+    length_m: 93.0
+    width_m: 3.93
+    min_radius_m: 5.75
+    mean_abs_curvature: 0.0889
+    turn_integral_rad: 8.25
+    straight_fraction: 0.361
+    direction_changes: 4
+    bbox_m:
+    - 39.0
+    - 14.6
+    difficulty_index: 0.366
+    image_px:
+    - 939
+    - 452
+    origin:
+    - -23.453
+    - -12.301
+    n_waypoints: 185
+  - name: kata_02_taikyoku_nidan_08
+    seed: 202807
+    attempts: 1
+    length_m: 88.0
+    width_m: 4.09
+    min_radius_m: 4.92
+    mean_abs_curvature: 0.0951
+    turn_integral_rad: 8.34
+    straight_fraction: 0.39
+    direction_changes: 4
+    bbox_m:
+    - 37.2
+    - 13.1
+    difficulty_index: 0.382
+    image_px:
+    - 907
+    - 425
+    origin:
+    - -22.646
+    - -11.64
+    n_waypoints: 175
+  - name: kata_02_taikyoku_nidan_09
+    seed: 202808
+    attempts: 1
+    length_m: 99.0
+    width_m: 4.0
+    min_radius_m: 5.8
+    mean_abs_curvature: 0.0845
+    turn_integral_rad: 8.35
+    straight_fraction: 0.385
+    direction_changes: 4
+    bbox_m:
+    - 41.8
+    - 15.0
+    difficulty_index: 0.364
+    image_px:
+    - 996
+    - 461
+    origin:
+    - -24.879
+    - -12.617
+    n_waypoints: 197
+  - name: kata_02_taikyoku_nidan_10
+    seed: 202809
+    attempts: 4
+    length_m: 92.99
+    width_m: 3.9
+    min_radius_m: 6.05
+    mean_abs_curvature: 0.0898
+    turn_integral_rad: 8.32
+    straight_fraction: 0.358
+    direction_changes: 4
+    bbox_m:
+    - 38.6
+    - 15.1
+    difficulty_index: 0.362
+    image_px:
+    - 931
+    - 460
+    origin:
+    - -23.262
+    - -12.446
+    n_waypoints: 185
+  eval_tracks:
+  - name: kata_02_taikyoku_nidan_e1
+    seed: 202850
+    attempts: 1
+    length_m: 92.0
+    width_m: 3.8
+    min_radius_m: 5.51
+    mean_abs_curvature: 0.0919
+    turn_integral_rad: 8.43
+    straight_fraction: 0.376
+    direction_changes: 4
+    bbox_m:
+    - 38.5
+    - 14.4
+    difficulty_index: 0.378
+    image_px:
+    - 927
+    - 445
+    origin:
+    - -23.158
+    - -12.17
+    n_waypoints: 183
+- stage: 3
+  kata: Taikyoku Sandan
+  slug: taikyoku_sandan
+  family: stadium_chicane
+  competence: 'encadenar cambios de sentido a velocidad: chicane o doble S'
+  width_m:
+  - 3.6
+  - 4.0
+  rmin_m:
+  - 4.0
+  - 5.5
+  length_m:
+  - 80
+  - 115
+  max_speed: 6.0
+  train_tracks:
+  - name: kata_03_taikyoku_sandan_01
+    seed: 202900
+    attempts: 4
+    length_m: 108.0
+    width_m: 3.63
+    min_radius_m: 5.0
+    mean_abs_curvature: 0.0977
+    turn_integral_rad: 10.53
+    straight_fraction: 0.367
+    direction_changes: 8
+    bbox_m:
+    - 46.1
+    - 16.0
+    difficulty_index: 0.461
+    image_px:
+    - 1075
+    - 473
+    origin:
+    - -26.882
+    - -11.819
+    n_waypoints: 215
+  - name: kata_03_taikyoku_sandan_02
+    seed: 202901
+    attempts: 3
+    length_m: 86.0
+    width_m: 3.72
+    min_radius_m: 5.1
+    mean_abs_curvature: 0.1247
+    turn_integral_rad: 10.69
+    straight_fraction: 0.201
+    direction_changes: 8
+    bbox_m:
+    - 36.0
+    - 15.3
+    difficulty_index: 0.456
+    image_px:
+    - 874
+    - 462
+    origin:
+    - -21.819
+    - -11.533
+    n_waypoints: 171
+  - name: kata_03_taikyoku_sandan_03
+    seed: 202902
+    attempts: 8
+    length_m: 106.0
+    width_m: 3.93
+    min_radius_m: 5.12
+    mean_abs_curvature: 0.1002
+    turn_integral_rad: 10.6
+    straight_fraction: 0.336
+    direction_changes: 8
+    bbox_m:
+    - 45.5
+    - 15.9
+    difficulty_index: 0.447
+    image_px:
+    - 1069
+    - 476
+    origin:
+    - -26.696
+    - -12.128
+    n_waypoints: 211
+  - name: kata_03_taikyoku_sandan_04
+    seed: 202903
+    attempts: 10
+    length_m: 114.0
+    width_m: 3.67
+    min_radius_m: 4.46
+    mean_abs_curvature: 0.0937
+    turn_integral_rad: 10.66
+    straight_fraction: 0.418
+    direction_changes: 6
+    bbox_m:
+    - 50.0
+    - 12.6
+    difficulty_index: 0.453
+    image_px:
+    - 1154
+    - 405
+    origin:
+    - -28.877
+    - -11.142
+    n_waypoints: 227
+  - name: kata_03_taikyoku_sandan_05
+    seed: 202904
+    attempts: 5
+    length_m: 108.0
+    width_m: 3.93
+    min_radius_m: 5.64
+    mean_abs_curvature: 0.0963
+    turn_integral_rad: 10.38
+    straight_fraction: 0.29
+    direction_changes: 8
+    bbox_m:
+    - 44.9
+    - 18.1
+    difficulty_index: 0.433
+    image_px:
+    - 1058
+    - 521
+    origin:
+    - -26.475
+    - -12.914
+    n_waypoints: 215
+  - name: kata_03_taikyoku_sandan_06
+    seed: 202905
+    attempts: 5
+    length_m: 102.0
+    width_m: 3.94
+    min_radius_m: 4.88
+    mean_abs_curvature: 0.0977
+    turn_integral_rad: 9.94
+    straight_fraction: 0.391
+    direction_changes: 6
+    bbox_m:
+    - 44.6
+    - 11.8
+    difficulty_index: 0.424
+    image_px:
+    - 1052
+    - 395
+    origin:
+    - -26.269
+    - -10.808
+    n_waypoints: 203
+  - name: kata_03_taikyoku_sandan_07
+    seed: 202906
+    attempts: 2
+    length_m: 109.0
+    width_m: 3.94
+    min_radius_m: 4.78
+    mean_abs_curvature: 0.102
+    turn_integral_rad: 11.1
+    straight_fraction: 0.391
+    direction_changes: 6
+    bbox_m:
+    - 47.7
+    - 12.8
+    difficulty_index: 0.435
+    image_px:
+    - 1113
+    - 416
+    origin:
+    - -27.744
+    - -11.828
+    n_waypoints: 217
+  - name: kata_03_taikyoku_sandan_08
+    seed: 202907
+    attempts: 1
+    length_m: 106.0
+    width_m: 3.84
+    min_radius_m: 5.57
+    mean_abs_curvature: 0.0979
+    turn_integral_rad: 10.35
+    straight_fraction: 0.317
+    direction_changes: 8
+    bbox_m:
+    - 45.6
+    - 16.0
+    difficulty_index: 0.438
+    image_px:
+    - 1070
+    - 477
+    origin:
+    - -26.72
+    - -11.874
+    n_waypoints: 211
+  - name: kata_03_taikyoku_sandan_09
+    seed: 202908
+    attempts: 7
+    length_m: 106.0
+    width_m: 3.64
+    min_radius_m: 4.51
+    mean_abs_curvature: 0.1023
+    turn_integral_rad: 10.82
+    straight_fraction: 0.423
+    direction_changes: 6
+    bbox_m:
+    - 46.3
+    - 11.7
+    difficulty_index: 0.453
+    image_px:
+    - 1080
+    - 387
+    origin:
+    - -27.013
+    - -10.736
+    n_waypoints: 211
+  - name: kata_03_taikyoku_sandan_10
+    seed: 202909
+    attempts: 1
+    length_m: 109.0
+    width_m: 3.92
+    min_radius_m: 4.65
+    mean_abs_curvature: 0.1068
+    turn_integral_rad: 11.62
+    straight_fraction: 0.349
+    direction_changes: 8
+    bbox_m:
+    - 46.4
+    - 16.9
+    difficulty_index: 0.468
+    image_px:
+    - 1086
+    - 497
+    origin:
+    - -27.2
+    - -12.186
+    n_waypoints: 217
+  eval_tracks:
+  - name: kata_03_taikyoku_sandan_e1
+    seed: 202950
+    attempts: 4
+    length_m: 93.0
+    width_m: 3.62
+    min_radius_m: 5.76
+    mean_abs_curvature: 0.1135
+    turn_integral_rad: 10.52
+    straight_fraction: 0.189
+    direction_changes: 8
+    bbox_m:
+    - 37.8
+    - 17.7
+    difficulty_index: 0.443
+    image_px:
+    - 909
+    - 506
+    origin:
+    - -22.712
+    - -12.598
+    n_waypoints: 185
+- stage: 4
+  kata: Heian Shodan
+  slug: heian_shodan
+  family: convex_polygon
+  competence: 'curvas de ~90 grados con rectas desiguales: frenar antes del vertice'
+  width_m:
+  - 3.4
+  - 3.8
+  rmin_m:
+  - 3.0
+  - 4.5
+  length_m:
+  - 70
+  - 110
+  max_speed: 6.0
+  train_tracks:
+  - name: kata_04_heian_shodan_01
+    seed: 203000
+    attempts: 1
+    length_m: 93.01
+    width_m: 3.6
+    min_radius_m: 4.59
+    mean_abs_curvature: 0.0676
+    turn_integral_rad: 6.29
+    straight_fraction: 0.511
+    direction_changes: 0
+    bbox_m:
+    - 32.2
+    - 27.3
+    difficulty_index: 0.347
+    image_px:
+    - 797
+    - 699
+    origin:
+    - -19.576
+    - -18.299
+    n_waypoints: 186
+  - name: kata_04_heian_shodan_02
+    seed: 203001
+    attempts: 1
+    length_m: 81.03
+    width_m: 3.45
+    min_radius_m: 4.07
+    mean_abs_curvature: 0.0776
+    turn_integral_rad: 6.29
+    straight_fraction: 0.556
+    direction_changes: 0
+    bbox_m:
+    - 29.6
+    - 25.2
+    difficulty_index: 0.373
+    image_px:
+    - 742
+    - 654
+    origin:
+    - -18.522
+    - -16.277
+    n_waypoints: 162
+  - name: kata_04_heian_shodan_03
+    seed: 203002
+    attempts: 1
+    length_m: 104.73
+    width_m: 3.44
+    min_radius_m: 4.59
+    mean_abs_curvature: 0.06
+    turn_integral_rad: 6.27
+    straight_fraction: 0.658
+    direction_changes: 0
+    bbox_m:
+    - 30.8
+    - 34.9
+    difficulty_index: 0.354
+    image_px:
+    - 766
+    - 847
+    origin:
+    - -16.238
+    - -22.646
+    n_waypoints: 209
+  - name: kata_04_heian_shodan_04
+    seed: 203003
+    attempts: 1
+    length_m: 83.39
+    width_m: 3.8
+    min_radius_m: 3.35
+    mean_abs_curvature: 0.0754
+    turn_integral_rad: 6.28
+    straight_fraction: 0.646
+    direction_changes: 0
+    bbox_m:
+    - 32.4
+    - 21.1
+    difficulty_index: 0.395
+    image_px:
+    - 805
+    - 579
+    origin:
+    - -19.884
+    - -12.69
+    n_waypoints: 166
+  - name: kata_04_heian_shodan_05
+    seed: 203004
+    attempts: 1
+    length_m: 80.04
+    width_m: 3.62
+    min_radius_m: 4.09
+    mean_abs_curvature: 0.0786
+    turn_integral_rad: 6.28
+    straight_fraction: 0.547
+    direction_changes: 0
+    bbox_m:
+    - 28.8
+    - 24.5
+    difficulty_index: 0.365
+    image_px:
+    - 728
+    - 643
+    origin:
+    - -19.134
+    - -16.265
+    n_waypoints: 160
+  - name: kata_04_heian_shodan_06
+    seed: 203005
+    attempts: 1
+    length_m: 100.03
+    width_m: 3.67
+    min_radius_m: 4.78
+    mean_abs_curvature: 0.0629
+    turn_integral_rad: 6.29
+    straight_fraction: 0.61
+    direction_changes: 0
+    bbox_m:
+    - 37.2
+    - 30.3
+    difficulty_index: 0.338
+    image_px:
+    - 898
+    - 759
+    origin:
+    - -22.703
+    - -18.22
+    n_waypoints: 200
+  - name: kata_04_heian_shodan_07
+    seed: 203006
+    attempts: 1
+    length_m: 101.0
+    width_m: 3.48
+    min_radius_m: 5.13
+    mean_abs_curvature: 0.0622
+    turn_integral_rad: 6.29
+    straight_fraction: 0.572
+    direction_changes: 0
+    bbox_m:
+    - 39.3
+    - 26.4
+    difficulty_index: 0.336
+    image_px:
+    - 935
+    - 679
+    origin:
+    - -23.756
+    - -16.266
+    n_waypoints: 202
+  - name: kata_04_heian_shodan_08
+    seed: 203007
+    attempts: 1
+    length_m: 84.02
+    width_m: 3.47
+    min_radius_m: 3.41
+    mean_abs_curvature: 0.0748
+    turn_integral_rad: 6.29
+    straight_fraction: 0.592
+    direction_changes: 0
+    bbox_m:
+    - 27.6
+    - 29.6
+    difficulty_index: 0.405
+    image_px:
+    - 702
+    - 742
+    origin:
+    - -17.33
+    - -18.514
+    n_waypoints: 168
+  - name: kata_04_heian_shodan_09
+    seed: 203008
+    attempts: 1
+    length_m: 75.97
+    width_m: 3.53
+    min_radius_m: 5.38
+    mean_abs_curvature: 0.0827
+    turn_integral_rad: 6.27
+    straight_fraction: 0.455
+    direction_changes: 0
+    bbox_m:
+    - 23.3
+    - 26.2
+    difficulty_index: 0.327
+    image_px:
+    - 618
+    - 675
+    origin:
+    - -14.362
+    - -16.881
+    n_waypoints: 151
+  - name: kata_04_heian_shodan_10
+    seed: 203009
+    attempts: 1
+    length_m: 95.01
+    width_m: 3.64
+    min_radius_m: 5.48
+    mean_abs_curvature: 0.0662
+    turn_integral_rad: 6.28
+    straight_fraction: 0.497
+    direction_changes: 0
+    bbox_m:
+    - 34.1
+    - 25.9
+    difficulty_index: 0.32
+    image_px:
+    - 835
+    - 671
+    origin:
+    - -20.77
+    - -18.182
+    n_waypoints: 190
+  eval_tracks:
+  - name: kata_04_heian_shodan_e1
+    seed: 203050
+    attempts: 1
+    length_m: 104.04
+    width_m: 3.53
+    min_radius_m: 3.91
+    mean_abs_curvature: 0.0604
+    turn_integral_rad: 6.29
+    straight_fraction: 0.649
+    direction_changes: 0
+    bbox_m:
+    - 37.9
+    - 31.4
+    difficulty_index: 0.377
+    image_px:
+    - 909
+    - 778
+    origin:
+    - -21.716
+    - -20.005
+    n_waypoints: 208
+- stage: 5
+  kata: Heian Nidan
+  slug: heian_nidan
+  family: concave_polygon
+  competence: 'girar hacia el otro lado: una curva concava (rinon)'
+  width_m:
+  - 3.2
+  - 3.6
+  rmin_m:
+  - 2.8
+  - 4.0
+  length_m:
+  - 80
+  - 120
+  max_speed: 7.0
+  train_tracks:
+  - name: kata_05_heian_nidan_01
+    seed: 203100
+    attempts: 1
+    length_m: 125.28
+    width_m: 3.6
+    min_radius_m: 3.88
+    mean_abs_curvature: 0.0549
+    turn_integral_rad: 6.88
+    straight_fraction: 0.693
+    direction_changes: 2
+    bbox_m:
+    - 51.7
+    - 26.6
+    difficulty_index: 0.404
+    image_px:
+    - 1187
+    - 684
+    origin:
+    - -30.753
+    - -19.054
+    n_waypoints: 250
+  - name: kata_05_heian_nidan_02
+    seed: 203101
+    attempts: 1
+    length_m: 80.14
+    width_m: 3.32
+    min_radius_m: 3.35
+    mean_abs_curvature: 0.0876
+    turn_integral_rad: 7.01
+    straight_fraction: 0.562
+    direction_changes: 2
+    bbox_m:
+    - 22.2
+    - 26.1
+    difficulty_index: 0.446
+    image_px:
+    - 591
+    - 670
+    origin:
+    - -16.17
+    - -16.672
+    n_waypoints: 160
+  - name: kata_05_heian_nidan_03
+    seed: 203102
+    attempts: 1
+    length_m: 119.07
+    width_m: 3.24
+    min_radius_m: 3.24
+    mean_abs_curvature: 0.0568
+    turn_integral_rad: 6.75
+    straight_fraction: 0.7
+    direction_changes: 2
+    bbox_m:
+    - 45.4
+    - 26.5
+    difficulty_index: 0.456
+    image_px:
+    - 1053
+    - 676
+    origin:
+    - -24.925
+    - -15.509
+    n_waypoints: 238
+  - name: kata_05_heian_nidan_04
+    seed: 203103
+    attempts: 1
+    length_m: 94.25
+    width_m: 3.33
+    min_radius_m: 3.36
+    mean_abs_curvature: 0.0733
+    turn_integral_rad: 6.89
+    straight_fraction: 0.617
+    direction_changes: 2
+    bbox_m:
+    - 33.6
+    - 25.8
+    difficulty_index: 0.444
+    image_px:
+    - 819
+    - 662
+    origin:
+    - -18.38
+    - -17.851
+    n_waypoints: 188
+  - name: kata_05_heian_nidan_05
+    seed: 203104
+    attempts: 1
+    length_m: 87.49
+    width_m: 3.54
+    min_radius_m: 4.74
+    mean_abs_curvature: 0.0836
+    turn_integral_rad: 7.29
+    straight_fraction: 0.453
+    direction_changes: 2
+    bbox_m:
+    - 31.9
+    - 25.2
+    difficulty_index: 0.376
+    image_px:
+    - 789
+    - 655
+    origin:
+    - -20.297
+    - -17.363
+    n_waypoints: 174
+  - name: kata_05_heian_nidan_06
+    seed: 203105
+    attempts: 1
+    length_m: 99.09
+    width_m: 3.5
+    min_radius_m: 4.37
+    mean_abs_curvature: 0.0723
+    turn_integral_rad: 7.16
+    straight_fraction: 0.568
+    direction_changes: 2
+    bbox_m:
+    - 32.0
+    - 34.6
+    difficulty_index: 0.39
+    image_px:
+    - 790
+    - 842
+    origin:
+    - -20.266
+    - -21.873
+    n_waypoints: 198
+  - name: kata_05_heian_nidan_07
+    seed: 203106
+    attempts: 1
+    length_m: 101.55
+    width_m: 3.23
+    min_radius_m: 3.15
+    mean_abs_curvature: 0.0707
+    turn_integral_rad: 7.17
+    straight_fraction: 0.7
+    direction_changes: 2
+    bbox_m:
+    - 25.3
+    - 39.3
+    difficulty_index: 0.465
+    image_px:
+    - 650
+    - 930
+    origin:
+    - -14.779
+    - -22.062
+    n_waypoints: 203
+  - name: kata_05_heian_nidan_08
+    seed: 203107
+    attempts: 1
+    length_m: 111.08
+    width_m: 3.38
+    min_radius_m: 3.16
+    mean_abs_curvature: 0.0685
+    turn_integral_rad: 7.6
+    straight_fraction: 0.678
+    direction_changes: 2
+    bbox_m:
+    - 28.1
+    - 37.4
+    difficulty_index: 0.46
+    image_px:
+    - 710
+    - 896
+    origin:
+    - -18.566
+    - -21.996
+    n_waypoints: 222
+  - name: kata_05_heian_nidan_09
+    seed: 203108
+    attempts: 1
+    length_m: 111.61
+    width_m: 3.3
+    min_radius_m: 3.42
+    mean_abs_curvature: 0.066
+    turn_integral_rad: 7.35
+    straight_fraction: 0.648
+    direction_changes: 2
+    bbox_m:
+    - 30.7
+    - 41.2
+    difficulty_index: 0.445
+    image_px:
+    - 760
+    - 970
+    origin:
+    - -16.932
+    - -25.105
+    n_waypoints: 223
+  - name: kata_05_heian_nidan_10
+    seed: 203109
+    attempts: 1
+    length_m: 106.46
+    width_m: 3.49
+    min_radius_m: 4.05
+    mean_abs_curvature: 0.0639
+    turn_integral_rad: 6.79
+    straight_fraction: 0.654
+    direction_changes: 2
+    bbox_m:
+    - 42.6
+    - 24.3
+    difficulty_index: 0.4
+    image_px:
+    - 1003
+    - 636
+    origin:
+    - -25.537
+    - -13.445
+    n_waypoints: 212
+  eval_tracks:
+  - name: kata_05_heian_nidan_e1
+    seed: 203150
+    attempts: 2
+    length_m: 82.41
+    width_m: 3.26
+    min_radius_m: 3.3
+    mean_abs_curvature: 0.0881
+    turn_integral_rad: 7.24
+    straight_fraction: 0.535
+    direction_changes: 2
+    bbox_m:
+    - 29.2
+    - 22.0
+    difficulty_index: 0.454
+    image_px:
+    - 730
+    - 587
+    origin:
+    - -16.623
+    - -14.61
+    n_waypoints: 164
+- stage: 6
+  kata: Heian Sandan
+  slug: heian_sandan
+  family: concave_polygon
+  competence: 'secuencias en S: curvas alternas de distinto signo'
+  width_m:
+  - 3.0
+  - 3.4
+  rmin_m:
+  - 2.5
+  - 3.5
+  length_m:
+  - 90
+  - 130
+  max_speed: 7.0
+  train_tracks:
+  - name: kata_06_heian_sandan_01
+    seed: 203200
+    attempts: 1
+    length_m: 120.99
+    width_m: 3.39
+    min_radius_m: 3.67
+    mean_abs_curvature: 0.0707
+    turn_integral_rad: 8.54
+    straight_fraction: 0.615
+    direction_changes: 6
+    bbox_m:
+    - 38.9
+    - 38.0
+    difficulty_index: 0.485
+    image_px:
+    - 927
+    - 908
+    origin:
+    - -20.194
+    - -23.418
+    n_waypoints: 241
+  - name: kata_06_heian_sandan_02
+    seed: 203201
+    attempts: 1
+    length_m: 129.41
+    width_m: 3.07
+    min_radius_m: 3.48
+    mean_abs_curvature: 0.0692
+    turn_integral_rad: 8.94
+    straight_fraction: 0.582
+    direction_changes: 6
+    bbox_m:
+    - 42.6
+    - 42.4
+    difficulty_index: 0.515
+    image_px:
+    - 994
+    - 990
+    origin:
+    - -22.865
+    - -25.816
+    n_waypoints: 258
+  - name: kata_06_heian_sandan_03
+    seed: 203202
+    attempts: 1
+    length_m: 99.37
+    width_m: 3.31
+    min_radius_m: 2.84
+    mean_abs_curvature: 0.0799
+    turn_integral_rad: 7.93
+    straight_fraction: 0.617
+    direction_changes: 6
+    bbox_m:
+    - 30.4
+    - 31.6
+    difficulty_index: 0.54
+    image_px:
+    - 754
+    - 778
+    origin:
+    - -22.349
+    - -19.561
+    n_waypoints: 198
+  - name: kata_06_heian_sandan_04
+    seed: 203203
+    attempts: 1
+    length_m: 120.05
+    width_m: 3.39
+    min_radius_m: 3.36
+    mean_abs_curvature: 0.0661
+    turn_integral_rad: 7.93
+    straight_fraction: 0.658
+    direction_changes: 4
+    bbox_m:
+    - 39.7
+    - 36.2
+    difficulty_index: 0.473
+    image_px:
+    - 942
+    - 872
+    origin:
+    - -25.309
+    - -20.336
+    n_waypoints: 240
+  - name: kata_06_heian_sandan_05
+    seed: 203204
+    attempts: 1
+    length_m: 107.35
+    width_m: 3.24
+    min_radius_m: 3.62
+    mean_abs_curvature: 0.0795
+    turn_integral_rad: 8.52
+    straight_fraction: 0.545
+    direction_changes: 6
+    bbox_m:
+    - 42.3
+    - 26.0
+    difficulty_index: 0.495
+    image_px:
+    - 992
+    - 665
+    origin:
+    - -25.182
+    - -18.084
+    n_waypoints: 214
+  - name: kata_06_heian_sandan_06
+    seed: 203205
+    attempts: 1
+    length_m: 98.01
+    width_m: 3.16
+    min_radius_m: 2.76
+    mean_abs_curvature: 0.0763
+    turn_integral_rad: 7.48
+    straight_fraction: 0.612
+    direction_changes: 4
+    bbox_m:
+    - 35.8
+    - 24.2
+    difficulty_index: 0.527
+    image_px:
+    - 860
+    - 628
+    origin:
+    - -22.858
+    - -16.344
+    n_waypoints: 196
+  - name: kata_06_heian_sandan_07
+    seed: 203206
+    attempts: 1
+    length_m: 126.08
+    width_m: 3.24
+    min_radius_m: 3.59
+    mean_abs_curvature: 0.0598
+    turn_integral_rad: 7.53
+    straight_fraction: 0.649
+    direction_changes: 4
+    bbox_m:
+    - 41.8
+    - 37.1
+    difficulty_index: 0.465
+    image_px:
+    - 981
+    - 886
+    origin:
+    - -27.239
+    - -23.722
+    n_waypoints: 252
+  - name: kata_06_heian_sandan_08
+    seed: 203207
+    attempts: 1
+    length_m: 115.02
+    width_m: 3.25
+    min_radius_m: 3.4
+    mean_abs_curvature: 0.0675
+    turn_integral_rad: 7.76
+    straight_fraction: 0.602
+    direction_changes: 4
+    bbox_m:
+    - 36.8
+    - 30.6
+    difficulty_index: 0.477
+    image_px:
+    - 881
+    - 757
+    origin:
+    - -23.492
+    - -19.314
+    n_waypoints: 230
+  - name: kata_06_heian_sandan_09
+    seed: 203208
+    attempts: 1
+    length_m: 113.01
+    width_m: 3.03
+    min_radius_m: 2.85
+    mean_abs_curvature: 0.0702
+    turn_integral_rad: 7.94
+    straight_fraction: 0.635
+    direction_changes: 4
+    bbox_m:
+    - 40.2
+    - 32.9
+    difficulty_index: 0.53
+    image_px:
+    - 946
+    - 799
+    origin:
+    - -23.335
+    - -20.84
+    n_waypoints: 226
+  - name: kata_06_heian_sandan_10
+    seed: 203209
+    attempts: 1
+    length_m: 120.92
+    width_m: 3.02
+    min_radius_m: 2.75
+    mean_abs_curvature: 0.0663
+    turn_integral_rad: 8.0
+    straight_fraction: 0.644
+    direction_changes: 6
+    bbox_m:
+    - 35.8
+    - 39.8
+    difficulty_index: 0.565
+    image_px:
+    - 857
+    - 936
+    origin:
+    - -17.371
+    - -23.594
+    n_waypoints: 241
+  eval_tracks:
+  - name: kata_06_heian_sandan_e1
+    seed: 203250
+    attempts: 1
+    length_m: 102.03
+    width_m: 3.17
+    min_radius_m: 3.48
+    mean_abs_curvature: 0.0738
+    turn_integral_rad: 7.53
+    straight_fraction: 0.554
+    direction_changes: 4
+    bbox_m:
+    - 33.7
+    - 26.3
+    difficulty_index: 0.475
+    image_px:
+    - 819
+    - 669
+    origin:
+    - -22.03
+    - -16.496
+    n_waypoints: 204
+- stage: 7
+  kata: Heian Yondan
+  slug: heian_yondan
+  family: hairpin_polygon
+  competence: 'horquilla: frenada fuerte y giro de 180 grados'
+  width_m:
+  - 3.0
+  - 3.2
+  rmin_m:
+  - 2.2
+  - 3.0
+  length_m:
+  - 90
+  - 140
+  max_speed: 8.0
+  train_tracks:
+  - name: kata_07_heian_yondan_01
+    seed: 203300
+    attempts: 1
+    length_m: 127.58
+    width_m: 3.06
+    min_radius_m: 1.93
+    mean_abs_curvature: 0.1024
+    turn_integral_rad: 13.06
+    straight_fraction: 0.608
+    direction_changes: 6
+    bbox_m:
+    - 42.9
+    - 31.1
+    difficulty_index: 0.691
+    image_px:
+    - 1000
+    - 764
+    origin:
+    - -24.262
+    - -18.828
+    n_waypoints: 255
+  - name: kata_07_heian_yondan_02
+    seed: 203301
+    attempts: 3
+    length_m: 111.03
+    width_m: 3.14
+    min_radius_m: 1.97
+    mean_abs_curvature: 0.1127
+    turn_integral_rad: 12.51
+    straight_fraction: 0.561
+    direction_changes: 6
+    bbox_m:
+    - 37.8
+    - 29.4
+    difficulty_index: 0.683
+    image_px:
+    - 898
+    - 732
+    origin:
+    - -21.519
+    - -16.473
+    n_waypoints: 222
+  - name: kata_07_heian_yondan_03
+    seed: 203302
+    attempts: 1
+    length_m: 119.04
+    width_m: 3.11
+    min_radius_m: 1.96
+    mean_abs_curvature: 0.1124
+    turn_integral_rad: 13.38
+    straight_fraction: 0.578
+    direction_changes: 6
+    bbox_m:
+    - 42.2
+    - 34.1
+    difficulty_index: 0.691
+    image_px:
+    - 987
+    - 825
+    origin:
+    - -24.159
+    - -19.836
+    n_waypoints: 238
+  - name: kata_07_heian_yondan_04
+    seed: 203303
+    attempts: 1
+    length_m: 92.44
+    width_m: 3.17
+    min_radius_m: 1.98
+    mean_abs_curvature: 0.145
+    turn_integral_rad: 13.37
+    straight_fraction: 0.396
+    direction_changes: 6
+    bbox_m:
+    - 23.8
+    - 29.1
+    difficulty_index: 0.687
+    image_px:
+    - 620
+    - 727
+    origin:
+    - -14.985
+    - -20.046
+    n_waypoints: 184
+  - name: kata_07_heian_yondan_05
+    seed: 203304
+    attempts: 1
+    length_m: 96.96
+    width_m: 3.08
+    min_radius_m: 1.94
+    mean_abs_curvature: 0.1259
+    turn_integral_rad: 12.18
+    straight_fraction: 0.496
+    direction_changes: 4
+    bbox_m:
+    - 34.0
+    - 25.7
+    difficulty_index: 0.659
+    image_px:
+    - 822
+    - 655
+    origin:
+    - -19.611
+    - -15.552
+    n_waypoints: 193
+  - name: kata_07_heian_yondan_06
+    seed: 203305
+    attempts: 1
+    length_m: 123.76
+    width_m: 3.15
+    min_radius_m: 1.97
+    mean_abs_curvature: 0.1018
+    turn_integral_rad: 12.6
+    straight_fraction: 0.59
+    direction_changes: 6
+    bbox_m:
+    - 41.4
+    - 28.3
+    difficulty_index: 0.683
+    image_px:
+    - 972
+    - 710
+    origin:
+    - -23.436
+    - -17.053
+    n_waypoints: 247
+  - name: kata_07_heian_yondan_07
+    seed: 203306
+    attempts: 3
+    length_m: 132.71
+    width_m: 3.15
+    min_radius_m: 1.97
+    mean_abs_curvature: 0.0949
+    turn_integral_rad: 12.58
+    straight_fraction: 0.626
+    direction_changes: 4
+    bbox_m:
+    - 47.4
+    - 32.3
+    difficulty_index: 0.658
+    image_px:
+    - 1091
+    - 789
+    origin:
+    - -25.567
+    - -20.4
+    n_waypoints: 265
+  - name: kata_07_heian_yondan_08
+    seed: 203307
+    attempts: 3
+    length_m: 100.39
+    width_m: 3.2
+    min_radius_m: 2.0
+    mean_abs_curvature: 0.1255
+    turn_integral_rad: 12.58
+    straight_fraction: 0.529
+    direction_changes: 4
+    bbox_m:
+    - 33.2
+    - 24.8
+    difficulty_index: 0.655
+    image_px:
+    - 808
+    - 640
+    origin:
+    - -20.498
+    - -15.61
+    n_waypoints: 200
+  - name: kata_07_heian_yondan_09
+    seed: 203308
+    attempts: 1
+    length_m: 89.98
+    width_m: 3.04
+    min_radius_m: 1.92
+    mean_abs_curvature: 0.14
+    turn_integral_rad: 12.57
+    straight_fraction: 0.507
+    direction_changes: 4
+    bbox_m:
+    - 30.1
+    - 24.0
+    difficulty_index: 0.664
+    image_px:
+    - 743
+    - 621
+    origin:
+    - -17.168
+    - -15.987
+    n_waypoints: 179
+  - name: kata_07_heian_yondan_10
+    seed: 203309
+    attempts: 2
+    length_m: 117.15
+    width_m: 3.12
+    min_radius_m: 1.96
+    mean_abs_curvature: 0.1113
+    turn_integral_rad: 13.03
+    straight_fraction: 0.605
+    direction_changes: 6
+    bbox_m:
+    - 46.0
+    - 20.1
+    difficulty_index: 0.688
+    image_px:
+    - 1063
+    - 545
+    origin:
+    - -25.343
+    - -11.696
+    n_waypoints: 234
+  eval_tracks:
+  - name: kata_07_heian_yondan_e1
+    seed: 203350
+    attempts: 1
+    length_m: 126.42
+    width_m: 3.03
+    min_radius_m: 1.91
+    mean_abs_curvature: 0.1046
+    turn_integral_rad: 13.21
+    straight_fraction: 0.598
+    direction_changes: 6
+    bbox_m:
+    - 34.4
+    - 36.9
+    difficulty_index: 0.694
+    image_px:
+    - 829
+    - 880
+    origin:
+    - -24.033
+    - -23.263
+    n_waypoints: 252
+- stage: 8
+  kata: Heian Godan
+  slug: heian_godan
+  family: hairpin_polygon
+  competence: 'combinacion: recta larga, horquillas y S a velocidad'
+  width_m:
+  - 2.8
+  - 3.2
+  rmin_m:
+  - 2.0
+  - 2.8
+  length_m:
+  - 100
+  - 150
+  max_speed: 8.0
+  train_tracks:
+  - name: kata_08_heian_godan_01
+    seed: 203400
+    attempts: 1
+    length_m: 121.81
+    width_m: 3.07
+    min_radius_m: 1.94
+    mean_abs_curvature: 0.1068
+    turn_integral_rad: 13.0
+    straight_fraction: 0.561
+    direction_changes: 4
+    bbox_m:
+    - 42.5
+    - 26.4
+    difficulty_index: 0.665
+    image_px:
+    - 991
+    - 670
+    origin:
+    - -26.227
+    - -17.668
+    n_waypoints: 243
+  - name: kata_08_heian_godan_02
+    seed: 203401
+    attempts: 2
+    length_m: 117.71
+    width_m: 2.93
+    min_radius_m: 1.86
+    mean_abs_curvature: 0.1089
+    turn_integral_rad: 12.8
+    straight_fraction: 0.564
+    direction_changes: 6
+    bbox_m:
+    - 45.4
+    - 19.9
+    difficulty_index: 0.698
+    image_px:
+    - 1047
+    - 537
+    origin:
+    - -24.791
+    - -13.873
+    n_waypoints: 235
+  - name: kata_08_heian_godan_03
+    seed: 203402
+    attempts: 2
+    length_m: 112.81
+    width_m: 3.17
+    min_radius_m: 1.99
+    mean_abs_curvature: 0.1138
+    turn_integral_rad: 12.83
+    straight_fraction: 0.574
+    direction_changes: 6
+    bbox_m:
+    - 42.6
+    - 22.0
+    difficulty_index: 0.684
+    image_px:
+    - 995
+    - 584
+    origin:
+    - -23.42
+    - -13.424
+    n_waypoints: 225
+  - name: kata_08_heian_godan_04
+    seed: 203403
+    attempts: 1
+    length_m: 122.95
+    width_m: 2.96
+    min_radius_m: 1.88
+    mean_abs_curvature: 0.1054
+    turn_integral_rad: 12.94
+    straight_fraction: 0.599
+    direction_changes: 6
+    bbox_m:
+    - 47.7
+    - 27.8
+    difficulty_index: 0.697
+    image_px:
+    - 1094
+    - 697
+    origin:
+    - -27.458
+    - -18.131
+    n_waypoints: 245
+  - name: kata_08_heian_godan_05
+    seed: 203404
+    attempts: 1
+    length_m: 105.24
+    width_m: 3.18
+    min_radius_m: 1.99
+    mean_abs_curvature: 0.1234
+    turn_integral_rad: 12.96
+    straight_fraction: 0.498
+    direction_changes: 6
+    bbox_m:
+    - 39.3
+    - 22.1
+    difficulty_index: 0.684
+    image_px:
+    - 930
+    - 587
+    origin:
+    - -21.925
+    - -15.448
+    n_waypoints: 210
+  - name: kata_08_heian_godan_06
+    seed: 203405
+    attempts: 2
+    length_m: 116.08
+    width_m: 3.14
+    min_radius_m: 1.97
+    mean_abs_curvature: 0.1141
+    turn_integral_rad: 13.23
+    straight_fraction: 0.552
+    direction_changes: 4
+    bbox_m:
+    - 41.7
+    - 23.3
+    difficulty_index: 0.663
+    image_px:
+    - 977
+    - 610
+    origin:
+    - -25.449
+    - -15.092
+    n_waypoints: 232
+  - name: kata_08_heian_godan_07
+    seed: 203406
+    attempts: 2
+    length_m: 142.83
+    width_m: 2.83
+    min_radius_m: 1.81
+    mean_abs_curvature: 0.1384
+    turn_integral_rad: 19.76
+    straight_fraction: 0.511
+    direction_changes: 10
+    bbox_m:
+    - 47.8
+    - 35.9
+    difficulty_index: 0.8
+    image_px:
+    - 1092
+    - 856
+    origin:
+    - -27.863
+    - -22.092
+    n_waypoints: 285
+  - name: kata_08_heian_godan_08
+    seed: 203407
+    attempts: 4
+    length_m: 137.7
+    width_m: 2.88
+    min_radius_m: 1.84
+    mean_abs_curvature: 0.1035
+    turn_integral_rad: 14.23
+    straight_fraction: 0.584
+    direction_changes: 6
+    bbox_m:
+    - 45.9
+    - 35.3
+    difficulty_index: 0.71
+    image_px:
+    - 1056
+    - 844
+    origin:
+    - -24.257
+    - -19.317
+    n_waypoints: 275
+  - name: kata_08_heian_godan_09
+    seed: 203408
+    attempts: 6
+    length_m: 125.22
+    width_m: 2.93
+    min_radius_m: 1.86
+    mean_abs_curvature: 0.1552
+    turn_integral_rad: 19.4
+    straight_fraction: 0.424
+    direction_changes: 8
+    bbox_m:
+    - 41.0
+    - 29.2
+    difficulty_index: 0.766
+    image_px:
+    - 959
+    - 723
+    origin:
+    - -24.729
+    - -16.206
+    n_waypoints: 250
+  - name: kata_08_heian_godan_10
+    seed: 203409
+    attempts: 1
+    length_m: 136.24
+    width_m: 2.82
+    min_radius_m: 1.81
+    mean_abs_curvature: 0.0962
+    turn_integral_rad: 13.09
+    straight_fraction: 0.645
+    direction_changes: 6
+    bbox_m:
+    - 52.0
+    - 34.4
+    difficulty_index: 0.707
+    image_px:
+    - 1177
+    - 826
+    origin:
+    - -28.999
+    - -23.183
+    n_waypoints: 272
+  eval_tracks:
+  - name: kata_08_heian_godan_e1
+    seed: 203450
+    attempts: 2
+    length_m: 117.59
+    width_m: 3.18
+    min_radius_m: 1.99
+    mean_abs_curvature: 0.11
+    turn_integral_rad: 12.93
+    straight_fraction: 0.53
+    direction_changes: 6
+    bbox_m:
+    - 43.9
+    - 26.9
+    difficulty_index: 0.684
+    image_px:
+    - 1022
+    - 681
+    origin:
+    - -25.174
+    - -15.524
+    n_waypoints: 235
+- stage: 9
+  kata: Tekki Shodan
+  slug: tekki_shodan
+  family: slalom
+  competence: 'precision lateral en pasillo estrecho: eslalon'
+  width_m:
+  - 2.4
+  - 2.8
+  rmin_m:
+  - 2.4
+  - 3.2
+  length_m:
+  - 90
+  - 140
+  max_speed: 8.0
+  train_tracks:
+  - name: kata_09_tekki_shodan_01
+    seed: 203500
+    attempts: 5
+    length_m: 135.0
+    width_m: 2.55
+    min_radius_m: 2.9
+    mean_abs_curvature: 0.1167
+    turn_integral_rad: 15.73
+    straight_fraction: 0.456
+    direction_changes: 12
+    bbox_m:
+    - 61.6
+    - 8.5
+    difficulty_index: 0.711
+    image_px:
+    - 1364
+    - 302
+    origin:
+    - -34.063
+    - -8.581
+    n_waypoints: 269
+  - name: kata_09_tekki_shodan_02
+    seed: 203501
+    attempts: 1
+    length_m: 132.0
+    width_m: 2.44
+    min_radius_m: 3.08
+    mean_abs_curvature: 0.1173
+    turn_integral_rad: 15.45
+    straight_fraction: 0.391
+    direction_changes: 14
+    bbox_m:
+    - 59.8
+    - 11.2
+    difficulty_index: 0.705
+    image_px:
+    - 1326
+    - 353
+    origin:
+    - -33.129
+    - -8.893
+    n_waypoints: 263
+  - name: kata_09_tekki_shodan_03
+    seed: 203502
+    attempts: 1
+    length_m: 136.0
+    width_m: 2.71
+    min_radius_m: 3.5
+    mean_abs_curvature: 0.1141
+    turn_integral_rad: 15.49
+    straight_fraction: 0.42
+    direction_changes: 14
+    bbox_m:
+    - 62.0
+    - 10.9
+    difficulty_index: 0.656
+    image_px:
+    - 1375
+    - 353
+    origin:
+    - -34.458
+    - -8.801
+    n_waypoints: 271
+  - name: kata_09_tekki_shodan_04
+    seed: 203503
+    attempts: 4
+    length_m: 108.0
+    width_m: 2.49
+    min_radius_m: 3.2
+    mean_abs_curvature: 0.1193
+    turn_integral_rad: 12.86
+    straight_fraction: 0.418
+    direction_changes: 10
+    bbox_m:
+    - 48.0
+    - 9.4
+    difficulty_index: 0.65
+    image_px:
+    - 1090
+    - 318
+    origin:
+    - -27.221
+    - -8.71
+    n_waypoints: 215
+  - name: kata_09_tekki_shodan_05
+    seed: 203504
+    attempts: 1
+    length_m: 132.0
+    width_m: 2.66
+    min_radius_m: 2.56
+    mean_abs_curvature: 0.0973
+    turn_integral_rad: 12.82
+    straight_fraction: 0.548
+    direction_changes: 10
+    bbox_m:
+    - 61.5
+    - 8.9
+    difficulty_index: 0.69
+    image_px:
+    - 1363
+    - 313
+    origin:
+    - -33.961
+    - -7.793
+    n_waypoints: 263
+  - name: kata_09_tekki_shodan_06
+    seed: 203505
+    attempts: 2
+    length_m: 116.0
+    width_m: 2.49
+    min_radius_m: 2.69
+    mean_abs_curvature: 0.1279
+    turn_integral_rad: 14.8
+    straight_fraction: 0.374
+    direction_changes: 14
+    bbox_m:
+    - 52.7
+    - 10.2
+    difficulty_index: 0.729
+    image_px:
+    - 1185
+    - 334
+    origin:
+    - -29.514
+    - -8.531
+    n_waypoints: 231
+  - name: kata_09_tekki_shodan_07
+    seed: 203506
+    attempts: 1
+    length_m: 136.0
+    width_m: 2.72
+    min_radius_m: 2.83
+    mean_abs_curvature: 0.1001
+    turn_integral_rad: 13.58
+    straight_fraction: 0.558
+    direction_changes: 10
+    bbox_m:
+    - 63.2
+    - 7.7
+    difficulty_index: 0.665
+    image_px:
+    - 1398
+    - 290
+    origin:
+    - -34.966
+    - -8.156
+    n_waypoints: 271
+  - name: kata_09_tekki_shodan_08
+    seed: 203507
+    attempts: 3
+    length_m: 93.0
+    width_m: 2.48
+    min_radius_m: 2.92
+    mean_abs_curvature: 0.1384
+    turn_integral_rad: 12.83
+    straight_fraction: 0.34
+    direction_changes: 10
+    bbox_m:
+    - 41.5
+    - 10.2
+    difficulty_index: 0.672
+    image_px:
+    - 960
+    - 335
+    origin:
+    - -23.94
+    - -8.555
+    n_waypoints: 185
+  - name: kata_09_tekki_shodan_09
+    seed: 203508
+    attempts: 2
+    length_m: 138.0
+    width_m: 2.54
+    min_radius_m: 2.94
+    mean_abs_curvature: 0.1084
+    turn_integral_rad: 14.93
+    straight_fraction: 0.468
+    direction_changes: 12
+    bbox_m:
+    - 63.2
+    - 8.5
+    difficulty_index: 0.704
+    image_px:
+    - 1396
+    - 301
+    origin:
+    - -34.867
+    - -8.56
+    n_waypoints: 275
+  - name: kata_09_tekki_shodan_10
+    seed: 203509
+    attempts: 1
+    length_m: 108.0
+    width_m: 2.71
+    min_radius_m: 2.99
+    mean_abs_curvature: 0.1207
+    turn_integral_rad: 13.0
+    straight_fraction: 0.392
+    direction_changes: 10
+    bbox_m:
+    - 48.4
+    - 10.8
+    difficulty_index: 0.648
+    image_px:
+    - 1102
+    - 351
+    origin:
+    - -27.635
+    - -8.976
+    n_waypoints: 215
+  eval_tracks:
+  - name: kata_09_tekki_shodan_e1
+    seed: 203550
+    attempts: 1
+    length_m: 111.0
+    width_m: 2.43
+    min_radius_m: 3.34
+    mean_abs_curvature: 0.1426
+    turn_integral_rad: 15.79
+    straight_fraction: 0.3
+    direction_changes: 14
+    bbox_m:
+    - 48.6
+    - 11.9
+    difficulty_index: 0.691
+    image_px:
+    - 1101
+    - 366
+    origin:
+    - -27.547
+    - -9.186
+    n_waypoints: 221
+- stage: 10
+  kata: Bassai Dai
+  slug: bassai_dai
+  family: random_circuit
+  competence: 'asaltar la fortaleza: circuito aleatorio completo con horquillas y
+    estrechamientos'
+  width_m:
+  - 2.6
+  - 3.2
+  rmin_m:
+  - 1.8
+  - 2.6
+  length_m:
+  - 140
+  - 220
+  max_speed: 8.0
+  train_tracks:
+  - name: kata_10_bassai_dai_01
+    seed: 203600
+    attempts: 1
+    length_m: 195.19
+    width_m: 2.84
+    min_radius_m: 1.82
+    mean_abs_curvature: 0.1114
+    turn_integral_rad: 21.72
+    straight_fraction: 0.544
+    direction_changes: 12
+    bbox_m:
+    - 55.7
+    - 54.1
+    difficulty_index: 0.838
+    image_px:
+    - 1251
+    - 1219
+    origin:
+    - -30.132
+    - -31.701
+    n_waypoints: 390
+  - name: kata_10_bassai_dai_02
+    seed: 203601
+    attempts: 3
+    length_m: 167.07
+    width_m: 3.11
+    min_radius_m: 1.96
+    mean_abs_curvature: 0.0832
+    turn_integral_rad: 13.89
+    straight_fraction: 0.612
+    direction_changes: 8
+    bbox_m:
+    - 54.9
+    - 46.4
+    difficulty_index: 0.719
+    image_px:
+    - 1241
+    - 1071
+    origin:
+    - -28.649
+    - -27.445
+    n_waypoints: 334
+  - name: kata_10_bassai_dai_03
+    seed: 203602
+    attempts: 4
+    length_m: 143.17
+    width_m: 3.16
+    min_radius_m: 1.98
+    mean_abs_curvature: 0.1003
+    turn_integral_rad: 14.34
+    straight_fraction: 0.565
+    direction_changes: 10
+    bbox_m:
+    - 39.6
+    - 41.5
+    difficulty_index: 0.744
+    image_px:
+    - 937
+    - 973
+    origin:
+    - -24.055
+    - -22.76
+    n_waypoints: 286
+  - name: kata_10_bassai_dai_04
+    seed: 203603
+    attempts: 1
+    length_m: 179.04
+    width_m: 3.12
+    min_radius_m: 1.96
+    mean_abs_curvature: 0.0834
+    turn_integral_rad: 14.93
+    straight_fraction: 0.623
+    direction_changes: 10
+    bbox_m:
+    - 56.1
+    - 52.9
+    difficulty_index: 0.75
+    image_px:
+    - 1266
+    - 1201
+    origin:
+    - -33.001
+    - -29.578
+    n_waypoints: 358
+  - name: kata_10_bassai_dai_05
+    seed: 203604
+    attempts: 3
+    length_m: 184.37
+    width_m: 2.61
+    min_radius_m: 1.7
+    mean_abs_curvature: 0.0817
+    turn_integral_rad: 15.06
+    straight_fraction: 0.581
+    direction_changes: 12
+    bbox_m:
+    - 61.3
+    - 49.0
+    difficulty_index: 0.811
+    image_px:
+    - 1359
+    - 1112
+    origin:
+    - -36.993
+    - -27.264
+    n_waypoints: 368
+  - name: kata_10_bassai_dai_06
+    seed: 203605
+    attempts: 1
+    length_m: 166.59
+    width_m: 2.96
+    min_radius_m: 1.88
+    mean_abs_curvature: 0.0829
+    turn_integral_rad: 13.8
+    straight_fraction: 0.61
+    direction_changes: 8
+    bbox_m:
+    - 58.0
+    - 44.2
+    difficulty_index: 0.727
+    image_px:
+    - 1299
+    - 1023
+    origin:
+    - -34.33
+    - -25.641
+    n_waypoints: 333
+  - name: kata_10_bassai_dai_07
+    seed: 203606
+    attempts: 1
+    length_m: 148.63
+    width_m: 2.94
+    min_radius_m: 1.87
+    mean_abs_curvature: 0.0981
+    turn_integral_rad: 14.56
+    straight_fraction: 0.554
+    direction_changes: 10
+    bbox_m:
+    - 52.4
+    - 43.8
+    difficulty_index: 0.759
+    image_px:
+    - 1188
+    - 1015
+    origin:
+    - -27.737
+    - -25.184
+    n_waypoints: 297
+  - name: kata_10_bassai_dai_08
+    seed: 203607
+    attempts: 1
+    length_m: 171.98
+    width_m: 2.6
+    min_radius_m: 1.7
+    mean_abs_curvature: 0.0854
+    turn_integral_rad: 14.66
+    straight_fraction: 0.619
+    direction_changes: 10
+    bbox_m:
+    - 56.1
+    - 48.8
+    difficulty_index: 0.784
+    image_px:
+    - 1255
+    - 1109
+    origin:
+    - -34.624
+    - -28.85
+    n_waypoints: 343
+  - name: kata_10_bassai_dai_09
+    seed: 203608
+    attempts: 1
+    length_m: 179.64
+    width_m: 3.04
+    min_radius_m: 1.92
+    mean_abs_curvature: 0.1197
+    turn_integral_rad: 21.49
+    straight_fraction: 0.486
+    direction_changes: 14
+    bbox_m:
+    - 56.6
+    - 46.1
+    difficulty_index: 0.823
+    image_px:
+    - 1274
+    - 1063
+    origin:
+    - -32.254
+    - -29.388
+    n_waypoints: 359
+  - name: kata_10_bassai_dai_10
+    seed: 203609
+    attempts: 3
+    length_m: 154.3
+    width_m: 2.61
+    min_radius_m: 1.71
+    mean_abs_curvature: 0.1011
+    turn_integral_rad: 15.6
+    straight_fraction: 0.543
+    direction_changes: 8
+    bbox_m:
+    - 48.7
+    - 37.1
+    difficulty_index: 0.764
+    image_px:
+    - 1107
+    - 875
+    origin:
+    - -29.19
+    - -21.532
+    n_waypoints: 308
+  eval_tracks:
+  - name: kata_10_bassai_dai_e1
+    seed: 203650
+    attempts: 2
+    length_m: 199.19
+    width_m: 3.09
+    min_radius_m: 1.95
+    mean_abs_curvature: 0.1086
+    turn_integral_rad: 21.61
+    straight_fraction: 0.555
+    direction_changes: 12
+    bbox_m:
+    - 67.4
+    - 54.8
+    difficulty_index: 0.821
+    image_px:
+    - 1491
+    - 1239
+    origin:
+    - -39.382
+    - -30.547
+    n_waypoints: 398

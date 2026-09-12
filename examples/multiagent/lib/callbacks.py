@@ -445,22 +445,152 @@ class AverageSpeed(RLlibCallback):
             del user_data[episode_id]['speed_data']
 
 
+class CurriculumStats(RLlibCallback):
+    """Per-episode curriculum metrics read from the wrapper's own lap bookkeeping.
+
+    ``lap_success`` = fraction of agents that completed >= 1 full lap (monotonic arc-length
+    progress, so no finish-line farming); ``laps_completed`` = mean fractional laps.
+    ``lap_success_mean`` is the promotion metric used by ``MultipleAgentCallbacks``.
+    """
+
+    def on_episode_end(self, *, episode, base_env=None, env_index=None, **kwargs) -> None:
+        if base_env is None or env_index is None:
+            return
+        sub_env = base_env.get_sub_environments()[env_index]
+        if not hasattr(sub_env, "laps_completed"):
+            return
+        custom_metrics = getattr(episode, "custom_metrics", None)
+        if custom_metrics is None:
+            return
+        laps = np.asarray(sub_env.laps_completed, dtype=float)
+        custom_metrics["laps_completed"] = float(np.mean(laps))
+        custom_metrics["lap_success"] = float(np.mean(laps >= 1.0))
+        custom_metrics["curriculum_stage"] = float(getattr(sub_env, "curriculum_stage", 0))
+        custom_metrics["episode_timed_out"] = float(getattr(sub_env, "episode_timed_out", False))
+
+
 CALLBACKS = [
     # EpisodeDuration, # Fixed
     LapProgress, # Ok
     LapTime,# ok
     # CollisionStats, #ok
     AverageSpeed,
+    CurriculumStats,
 ]
 
 
 class MultipleAgentCallbacks(RLlibCallback):
-    """A custom RLlib callback to handle multiple agent environments."""
+    """A custom RLlib callback to handle multiple agent environments.
+
+    Besides fanning out the per-episode callbacks in ``CALLBACKS``, it drives the
+    curriculum: on every train result it reads ``lap_success_mean`` and promotes all
+    env runners to the next stage when the rule in ``env_config.curriculum.promotion``
+    is met (see ``_maybe_promote``). Stage state is persisted next to the trial so a
+    tune restart resumes at the right stage.
+    """
+
+    STATE_FILE = "curriculum_state.json"
 
     def __init__(self):
         super().__init__()
         self._callback_instances = {}
+        self._stage = 0
+        self._stage_start_ts = 0
+        self._streak = 0
+        self._n_stages = None
         callback_logger.debug("MultipleAgentCallbacks initialized")
+
+    # ---- curriculum driver (runs on the driver only) ----------------------------
+    @staticmethod
+    def _curriculum_cfg(algorithm):
+        try:
+            env_config = algorithm.config.env_config or {}
+        except Exception:
+            return None
+        cfg = env_config.get("curriculum")
+        if not cfg or cfg.get("eval_tracks"):
+            return None
+        return cfg
+
+    def _state_path(self, algorithm):
+        # Persist next to progress.csv / checkpoints (tune's StorageContext), so a resumed
+        # trial finds it. algorithm.logdir is only the per-session working dir (lost on restart).
+        trial_dir = None
+        storage = getattr(algorithm, "_storage", None)
+        if storage is not None:
+            trial_dir = getattr(storage, "trial_fs_path", None)
+        trial_dir = trial_dir or getattr(algorithm, "logdir", None)
+        return os.path.join(trial_dir, self.STATE_FILE) if trial_dir else None
+
+    def _save_state(self, algorithm):
+        path = self._state_path(algorithm)
+        if not path:
+            return
+        import json
+        with open(path, "w") as f:
+            json.dump({"stage": self._stage, "stage_start_ts": self._stage_start_ts}, f)
+
+    def _push_stage(self, algorithm, stage):
+        group = getattr(algorithm, "env_runner_group", None) or getattr(algorithm, "workers", None)
+        if group is None:
+            callback_logger.error("curriculum: no env runner group to push stage to")
+            return
+        stages_set = group.foreach_env(lambda env: env.set_stage(stage) if hasattr(env, "set_stage") else None)
+        callback_logger.info(f"curriculum: stage {stage} pushed to {len(stages_set)} envs")
+
+    def on_algorithm_init(self, *, algorithm, **kwargs) -> None:
+        cfg = self._curriculum_cfg(algorithm)
+        if cfg is None:
+            return
+        from examples.multiagent.lib.multiagent_env import load_curriculum_manifest
+        self._n_stages = len(load_curriculum_manifest(cfg["manifest"])["stages"])
+        self._stage = int(cfg.get("stage", 0))
+        path = self._state_path(algorithm)
+        if path and os.path.exists(path):
+            import json
+            with open(path) as f:
+                st = json.load(f)
+            self._stage = int(st.get("stage", self._stage))
+            self._stage_start_ts = int(st.get("stage_start_ts", 0))
+            callback_logger.info(f"curriculum: restored stage {self._stage} from {path}")
+            self._push_stage(algorithm, self._stage)
+
+    def on_train_result(self, *, algorithm, result, **kwargs) -> None:
+        cfg = self._curriculum_cfg(algorithm)
+        if cfg is None:
+            return
+        prom = cfg.get("promotion") or {}
+        threshold = float(prom.get("success_threshold", 0.8))
+        streak_needed = int(prom.get("streak", 3))
+        min_steps = int(prom.get("min_steps", 50_000))
+        max_steps = int(prom.get("max_steps", 200_000))
+        metric = prom.get("metric", "lap_success_mean")
+
+        ts = int(result.get("timesteps_total") or result.get("num_env_steps_sampled_lifetime") or 0)
+        runners = result.get("env_runners") or result.get("sampler_results") or {}
+        cm = runners.get("custom_metrics") or result.get("custom_metrics") or {}
+        success = cm.get(metric)
+        if success is not None and not np.isnan(success):
+            self._streak = self._streak + 1 if success >= threshold else 0
+        stage_steps = ts - self._stage_start_ts
+        last_stage = self._n_stages is not None and self._stage >= self._n_stages - 1
+        promote = (not last_stage) and (
+            (stage_steps >= min_steps and self._streak >= streak_needed) or stage_steps >= max_steps
+        )
+        if promote:
+            reason = "metric" if self._streak >= streak_needed else "budget"
+            self._stage += 1
+            self._stage_start_ts = ts
+            self._streak = 0
+            self._push_stage(algorithm, self._stage)
+            self._save_state(algorithm)
+            callback_logger.info(
+                f"curriculum: PROMOTED to stage {self._stage} at {ts} steps (reason={reason}, "
+                f"{metric}={success})")
+        result["curriculum/stage"] = self._stage
+        result["curriculum/stage_steps"] = stage_steps
+        result["curriculum/success_streak"] = self._streak
+        result["curriculum/lap_success"] = float(success) if success is not None else float("nan")
 
     def _get_callback_instance(self, callback_class, episode_id):
         """Get or create callback instance for this episode."""

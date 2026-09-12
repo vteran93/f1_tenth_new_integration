@@ -1,0 +1,6 @@
+image: kata_08_heian_godan_06_map.png
+resolution: 0.050000
+origin: [-25.449076, -15.092096, 0.000000]
+negate: 0
+occupied_thresh: 0.45
+free_thresh: 0.196
