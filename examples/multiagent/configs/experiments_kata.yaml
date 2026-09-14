@@ -10,7 +10,7 @@
 #   ../../venv/bin/python run.py --config configs/experiments_kata.yaml train --experiment kata_SAC_shared_ProgressTimePenalty
 # or ./run_kata_overnight.sh
 
-num_cpus: 7                  # per process (two processes share the 14-core box)
+num_cpus: 12                 # logical Ray budget per process; SAC v2 needs 4 (learner) + 5 runners + 1 eval
 num_env_runners: 5
 num_envs_per_env_runner: 2   # safe now that ScanSimulator2D is per-RaceCar (different maps per process)
 
