@@ -92,8 +92,13 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn, num_en
     # Clean up the config before passing to training
     if 'environment' in algo_config_file:
         del algo_config_file['environment']
-    # Optional `.reporting(...)` block (e.g. min_sample_timesteps_per_iteration for SAC)
+    # Optional blocks routed to their AlgorithmConfig sections instead of `.training()`:
+    #   reporting   -> .reporting(...)   e.g. min_sample_timesteps_per_iteration
+    #   env_runners -> .env_runners(...) e.g. rollout_fragment_length (amortises per-sample RPC)
+    #   resources   -> .resources(...)   e.g. num_cpus_for_main_process (torch threads of the learner)
     reporting_kwargs = algo_config_file.pop('reporting', None)
+    env_runners_kwargs = algo_config_file.pop('env_runners', None)
+    resources_kwargs = algo_config_file.pop('resources', None)
 
     # Opt-in NaN protection: route the policy through the NaN-protected action
     # distribution. Injected into the model config so it is serialised to every
@@ -146,6 +151,10 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn, num_en
     algo_config.training(**algo_config_file)
     if reporting_kwargs:
         algo_config.reporting(**reporting_kwargs)
+    if env_runners_kwargs:
+        algo_config.env_runners(**env_runners_kwargs)
+    if resources_kwargs:
+        algo_config.resources(**resources_kwargs)
     return algo_config
 
 

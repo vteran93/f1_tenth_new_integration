@@ -216,6 +216,10 @@ experiments:
       <<: *sac_params
       training_intensity:    32          # ~1 gradient step (batch 256) per 8 env steps (default was 25.6 -> ~1 per 10 but on a prioritized buffer)
       replay_buffer_config:  { type: MultiAgentReplayBuffer, capacity: 500000 }
+      # Throughput (measured 2026-09-14): with 1-step fragments each training_step spent ~120 ms
+      # in sampling RPC + ~390 ms buffer/bookkeeping for one 156 ms gradient step -> 14 env steps/s.
+      env_runners:           { rollout_fragment_length: 50 }   # 500 env steps per sample call
+      resources:             { num_cpus_for_main_process: 4 }  # torch threads for the learner
 
   # Tiny smoke test: 2 runners, promotion by budget every 2k steps, eval every 2 iterations.
   - name: kata_SMOKE_PPO
