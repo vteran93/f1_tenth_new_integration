@@ -197,3 +197,50 @@ desnormalización a unidades del entorno la hace el `RolloutWorker`. Cualquier e
 cargue solo la `Policy` debe aplicar `unsquash_action(a, policy.action_space_struct)`
 (`kata_eval_tracks.py` lo hace); sin ello el coche "se arrastra" a ≤ 1 m/s y los resultados
 son falsos.
+
+## 7. Tercera noche (2026-09-14 → 15): recompensa de Kohonda bajo el currículum v2
+
+Lanzados a las 22:00: `kata_v2_PPO_shared_Kohonda` y `kata_v2_SAC_shared_Kohonda` (mismo env v2,
+currículum y set de evaluación que `kata_v2_*`; solo cambia la recompensa), con
+`kata_v2_PPO_shared_ProgressTimePenalty` encolado detrás de PPO Kohonda. La máquina se
+reinició a las ~04:25: PPO Kohonda ya había terminado (5 M pasos, 5.8 h); los otros dos se
+reanudaron a las 10:22 desde su último checkpoint y su `curriculum_state.json`.
+
+**PPO + Kohonda**: promoción por métrica en las etapas 1–6 (todas antes de 0.8 M pasos),
+por presupuesto en 7–9. Evaluación reservada: 1.00 de éxito y ~11 vueltas por episodio a
+7.9 m/s en las iteraciones 350 y 450 (1.4–1.8 M pasos), luego oscila entre 0.55 y 0.90 al
+entrenar en Bassai Dai con la entropía cayendo hasta −2.3 nats. Política final (iter 1250),
+por pista reservada (`docs/kata_eval_20260915_ppo_kohonda_final.csv`):
+
+| Kata | Éxito | Vueltas | Vel. (m/s) | 1ª vuelta (s) |
+|---|---|---|---|---|
+| 01 Taikyoku Shodan | 1.00 | 11.6 | 7.9 | 7.8 |
+| 02 Taikyoku Nidan | 1.00 | 11.3 | 7.9 | 12.0 |
+| 03 Taikyoku Sandan | 1.00 | 11.3 | 7.9 | 12.0 |
+| 04 Heian Shodan | 1.00 | 11.0 | 8.0 | 13.7 |
+| 05 Heian Nidan | 1.00 | 11.0 | 7.9 | 11.1 |
+| 06 Heian Sandan | 0.50 | 5.6 | 6.9 | 13.4 |
+| 07 Heian Yondan | 0.50 | 5.5 | 7.0 | 17.3 |
+| 08 Heian Godan | 0.25 | 3.1 | 6.8 | 15.7 |
+| 09 Tekki Shodan | 0.75 | 8.4 | 7.7 | 14.5 |
+| 10 Bassai Dai | 0.00 | 0.3 | 6.8 | – |
+
+Global 0.70 de éxito, 7.9 vueltas por agente-episodio, frente a 0.57 / 2.7 vueltas / ~3 m/s
+de PPO + ProgressTimePenalty v1 (§6). El checkpoint de la iteración 470
+(`..._iter470.csv`) toma la horquilla de Heian Yondan en el 100 % de los casos y Heian Godan
+en el 75 %, pero falla en Taikyoku Shodan a esa velocidad; el mismo 0.70 global con otro
+reparto. Lección: guardar checkpoints por métrica de evaluación, no por retorno de
+entrenamiento (`checkpoint_score_attribute`), porque el mejor punto (iter 350–450) no se
+conservó.
+
+Confundidor pendiente: respecto a la noche 1 cambian a la vez la recompensa y el espacio de
+acción v2. `kata_v2_PPO_shared_ProgressTimePenalty` (en curso) separa los dos efectos; a
+0.63 M pasos ya estaba en la etapa 5 por métrica con 0.35 de éxito en evaluación.
+
+**SAC + Kohonda**: a 0.4 M pasos (6.4 h) conduce a 3.8 m/s y choca a los ~4 s; 0.22 vueltas,
+sin éxito; `alpha` vuelve a colapsar (0.21 → 0.01 en 120k pasos). Tercera variante
+(congelarse, arrastrarse, correr y chocar) con el mismo síntoma de fondo: SAC deja de
+explorar antes de encontrar la primera vuelta. Siguiente palanca: `target_entropy` fijo
+(≈ −1) e `initial_alpha` alto con `alpha_lr` bajo. Reanudado para completar su presupuesto.
+
+Vídeos: `examples/multiagent/eval_videos/kata_20260915_ppo_kohonda/`.
