@@ -556,6 +556,20 @@ class MultipleAgentCallbacks(RLlibCallback):
             self._push_stage(algorithm, self._stage)
 
     def on_train_result(self, *, algorithm, result, **kwargs) -> None:
+        # Carry the last held-out evaluation metrics forward so that every result (and hence
+        # every checkpoint, which tune scores with the result at checkpoint time) has them,
+        # even though evaluation only runs every `evaluation_interval` iterations.
+        ev = (result.get("evaluation") or {}).get("env_runners") or {}
+        ecm = ev.get("custom_metrics") or {}
+        if "lap_success_mean" in ecm:
+            self._last_eval = {
+                "eval/lap_success_last": float(ecm["lap_success_mean"]),
+                "eval/laps_completed_last": float(ecm.get("laps_completed_mean", float("nan"))),
+                "eval/iteration_last": int(result.get("training_iteration", 0)),
+            }
+        result.update(getattr(self, "_last_eval", {"eval/lap_success_last": 0.0,
+                                                    "eval/laps_completed_last": 0.0,
+                                                    "eval/iteration_last": 0}))
         cfg = self._curriculum_cfg(algorithm)
         if cfg is None:
             return

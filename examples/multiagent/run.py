@@ -253,7 +253,10 @@ def run_training(config):
         config=config_algo.to_dict(),
         stop=combined_stopper,
         checkpoint_config=tune.CheckpointConfig(
-            checkpoint_score_attribute="env_runners/episode_return_mean",
+            # `training.checkpoint_metric` lets a run keep its best checkpoints by the
+            # held-out evaluation metric (carried forward every iteration by the callbacks
+            # as `eval/lap_success_last`) instead of the shaped training return.
+            checkpoint_score_attribute=config["training"].get("checkpoint_metric", "env_runners/episode_return_mean"),
             checkpoint_score_order="max",
             num_to_keep=3,
             checkpoint_at_end=True,
