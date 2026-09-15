@@ -66,7 +66,7 @@ def load_config(path):
 
 def init_ray(local_mode=False, num_cpus=16):
     ray.init(local_mode=local_mode, ignore_reinit_error=True, num_cpus=num_cpus,
-             num_gpus=0)
+             num_gpus=0, include_dashboard=False)
 
 
 def get_logger(name, level=logging.INFO):

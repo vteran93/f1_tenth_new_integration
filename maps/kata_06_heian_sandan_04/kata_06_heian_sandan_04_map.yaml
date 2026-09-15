@@ -1,0 +1,6 @@
+image: kata_06_heian_sandan_04_map.png
+resolution: 0.050000
+origin: [-25.308768, -20.336306, 0.000000]
+negate: 0
+occupied_thresh: 0.45
+free_thresh: 0.196

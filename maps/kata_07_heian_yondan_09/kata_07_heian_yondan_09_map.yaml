@@ -1,0 +1,6 @@
+image: kata_07_heian_yondan_09_map.png
+resolution: 0.050000
+origin: [-17.167791, -15.987058, 0.000000]
+negate: 0
+occupied_thresh: 0.45
+free_thresh: 0.196

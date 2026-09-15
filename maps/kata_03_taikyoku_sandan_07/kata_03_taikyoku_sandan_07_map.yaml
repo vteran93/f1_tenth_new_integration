@@ -1,0 +1,6 @@
+image: kata_03_taikyoku_sandan_07_map.png
+resolution: 0.050000
+origin: [-27.744376, -11.828329, 0.000000]
+negate: 0
+occupied_thresh: 0.45
+free_thresh: 0.196

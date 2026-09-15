@@ -1,0 +1,6 @@
+image: kata_04_heian_shodan_07_map.png
+resolution: 0.050000
+origin: [-23.756268, -16.266285, 0.000000]
+negate: 0
+occupied_thresh: 0.45
+free_thresh: 0.196

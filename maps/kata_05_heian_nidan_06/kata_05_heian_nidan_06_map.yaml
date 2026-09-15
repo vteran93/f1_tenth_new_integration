@@ -1,0 +1,6 @@
+image: kata_05_heian_nidan_06_map.png
+resolution: 0.050000
+origin: [-20.265892, -21.873211, 0.000000]
+negate: 0
+occupied_thresh: 0.45
+free_thresh: 0.196

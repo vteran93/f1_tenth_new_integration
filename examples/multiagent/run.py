@@ -92,6 +92,13 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn, num_en
     # Clean up the config before passing to training
     if 'environment' in algo_config_file:
         del algo_config_file['environment']
+    # Optional blocks routed to their AlgorithmConfig sections instead of `.training()`:
+    #   reporting   -> .reporting(...)   e.g. min_sample_timesteps_per_iteration
+    #   env_runners -> .env_runners(...) e.g. rollout_fragment_length (amortises per-sample RPC)
+    #   resources   -> .resources(...)   e.g. num_cpus_for_main_process (torch threads of the learner)
+    reporting_kwargs = algo_config_file.pop('reporting', None)
+    env_runners_kwargs = algo_config_file.pop('env_runners', None)
+    resources_kwargs = algo_config_file.pop('resources', None)
 
     # Opt-in NaN protection: route the policy through the NaN-protected action
     # distribution. Injected into the model config so it is serialised to every
@@ -101,6 +108,17 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn, num_en
         model_cfg['custom_action_dist'] = NAN_PROTECTED_ACTION_DIST
         algo_config_file['model'] = model_cfg
         logger.info(f"NaN protection enabled: using custom_action_dist='{NAN_PROTECTED_ACTION_DIST}'")
+
+    # Evaluation env: same env_config unless `evaluation.env` overrides keys (e.g. a fixed
+    # held-out curriculum track list), optionally deterministic (`evaluation.explore: false`).
+    eval_cfg = config.get("evaluation", {}) or {}
+    evaluation_config = {"seed": SEED}
+    if eval_cfg.get("env"):
+        eval_env_config = dict(env_config)
+        eval_env_config.update(eval_cfg["env"])
+        evaluation_config["env_config"] = eval_env_config
+    if "explore" in eval_cfg:
+        evaluation_config["explore"] = bool(eval_cfg["explore"])
 
     algo_config = (
         AlgoConfigClass()
@@ -118,7 +136,9 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn, num_en
         .evaluation(
             evaluation_interval=config["training"]["eval_interval"],
             evaluation_num_env_runners=1,
-            evaluation_config={"seed": SEED},
+            evaluation_duration=eval_cfg.get("episodes", 10),
+            evaluation_duration_unit="episodes",
+            evaluation_config=evaluation_config,
         )
         .env_runners(
             num_env_runners=num_env_runners,             # Number of parallel processes (<= CPUs)
@@ -129,6 +149,12 @@ def get_algorithm_config(config, env_config, policies, policy_mapping_fn, num_en
     )
 
     algo_config.training(**algo_config_file)
+    if reporting_kwargs:
+        algo_config.reporting(**reporting_kwargs)
+    if env_runners_kwargs:
+        algo_config.env_runners(**env_runners_kwargs)
+    if resources_kwargs:
+        algo_config.resources(**resources_kwargs)
     return algo_config
 
 
@@ -191,11 +217,13 @@ def run_training(config):
     # Define timesteps stopper
     timesteps_stopper = TimestepsStopper(max_timesteps=config["training"]["timesteps_total"])
 
-    # Combine both stoppers - trial will stop if ANY of the conditions is met
-    combined_stopper = CombinedStopper(
-        plateau_stopper,
-        timesteps_stopper
-    )
+    # Combine both stoppers - trial will stop if ANY of the conditions is met.
+    # `training.plateau_stop: false` disables the plateau stopper (curriculum runs change
+    # the reward scale at every stage, so a within-stage plateau must not end the trial).
+    if config["training"].get("plateau_stop", True):
+        combined_stopper = CombinedStopper(plateau_stopper, timesteps_stopper)
+    else:
+        combined_stopper = timesteps_stopper
 
     # Setup search algorithm for hyperparameter tuning
     tune_kwargs = {}
@@ -225,7 +253,10 @@ def run_training(config):
         config=config_algo.to_dict(),
         stop=combined_stopper,
         checkpoint_config=tune.CheckpointConfig(
-            checkpoint_score_attribute="env_runners/episode_return_mean",
+            # `training.checkpoint_metric` lets a run keep its best checkpoints by the
+            # held-out evaluation metric (carried forward every iteration by the callbacks
+            # as `eval/lap_success_last`) instead of the shaped training return.
+            checkpoint_score_attribute=config["training"].get("checkpoint_metric", "env_runners/episode_return_mean"),
             checkpoint_score_order="max",
             num_to_keep=3,
             checkpoint_at_end=True,
