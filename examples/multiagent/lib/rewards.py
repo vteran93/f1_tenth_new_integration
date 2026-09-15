@@ -591,6 +591,24 @@ class KohondaMultiAgentF110Env(MultiAgentF110):
         # Store crashed agents to avoid repeated calculations
         self._crashed_agents = set()
 
+    # Curriculum support: the track can change at every reset, so the waypoint table and the
+    # per-agent "previous waypoint" must be rebuilt from the CURRENT track at reset time.
+    # Without this the reward would measure progress against the previous episode's track
+    # and the first step would score the jump from the stale previous waypoint.
+    def reset(self, *, seed=None, options=None):
+        obs, info = super().reset(seed=seed, options=options)
+        self._waypoints = np.stack(
+            [self.env.track.raceline.xs, self.env.track.raceline.ys], axis=-1
+        ).astype(np.float32)
+        for i in range(self.env.num_agents):
+            pt, idx = self.calc_current_waypoint(i)
+            self._current_waypoints[i] = pt
+            self._current_indices[i] = idx
+            self.prev_waypoints[i] = pt
+        self.prev_vels[:] = 0.0
+        self.prev_yaw[:] = 0.0
+        return obs, info
+
     def _compute_reward(self, agent, newly_crashed, i) -> float:
         """
         Compute Kohonda-style reward for individual agent.
@@ -613,8 +631,11 @@ class KohondaMultiAgentF110Env(MultiAgentF110):
         self._current_waypoints[i] = pt
         self._current_indices[i] = idx
 
-        # Calculate progress as distance between current and previous waypoint
-        dist = np.linalg.norm(self._current_waypoints[i] - self.prev_waypoints[i])
+        # Calculate progress as distance between current and previous waypoint.
+        # Bounded by the physically possible displacement per RL step: a nearest-point flip
+        # between the two legs of a hairpin would otherwise pay tens of metres at once.
+        dist = float(np.linalg.norm(self._current_waypoints[i] - self.prev_waypoints[i]))
+        dist = min(dist, self.MAX_STEP_PROGRESS)
 
         # Collision penalty scaled by velocity (matching original implementation)
         collision_penalty = 0.0

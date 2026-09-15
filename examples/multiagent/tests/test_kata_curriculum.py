@@ -105,3 +105,32 @@ def test_speed_action_range_rescales_action_space():
         if term["__all__"] or trunc["__all__"]:
             break
     assert env.env.sim.agents[0].state[3] <= 5.0 + 1e-3  # stage/max_speed cap still applies
+
+
+@pytest.mark.skipif(not MANIFEST.exists(), reason="generate maps first")
+def test_kohonda_reward_follows_track_switches():
+    from examples.multiagent.lib.rewards import KohondaMultiAgentF110Env
+
+    env_config = dict(
+        map="kata_01_taikyoku_shodan_01", num_agents=2, timestep=0.01, num_beams=36, integrator="rk4",
+        control_input=["speed", "steering_angle"], observation_config={"type": "original"},
+        reset_config={"type": "cl_grid_static"}, action_repeat=5, speed_action_range=[0.5, 8.0],
+        episode_timeout={"steps": 40},
+        curriculum={"manifest": str(MANIFEST), "stage": 9, "mix_prev": 0.0},
+    )
+    env = KohondaMultiAgentF110Env(env_config=env_config)
+    for _ in range(3):
+        obs, _ = env.reset()
+        # waypoint table must belong to the current track
+        assert len(env._waypoints) == len(env.env.track.raceline.xs)
+        first = None
+        for _ in range(40):
+            obs, rew, term, trunc, _ = env.step({a: np.array([0.0, 2.0], np.float32) for a in obs})
+            if first is None:
+                first = rew
+            assert all(np.isfinite(list(rew.values())))
+            assert all(r <= env.MAX_STEP_PROGRESS + 1e-6 for r in rew.values())
+            if term["__all__"] or trunc["__all__"]:
+                break
+        # no spurious jump on the first step (2 m/s * 0.05 s = 0.1 m of progress at most ~0.3 m)
+        assert all(r < 0.5 for r in first.values())
