@@ -244,3 +244,26 @@ explorar antes de encontrar la primera vuelta. Siguiente palanca: `target_entrop
 (≈ −1) e `initial_alpha` alto con `alpha_lr` bajo. Reanudado para completar su presupuesto.
 
 Vídeos: `examples/multiagent/eval_videos/kata_20260915_ppo_kohonda/`.
+
+## 8. Matriz PPO cerrada y SAC v3 / v3b (2026-09-15)
+
+`kata_v2_PPO_shared_ProgressTimePenalty` terminó (5 M pasos, 4.7 h). Evaluación reservada final
+0.60 de éxito en RLlib y 0.68 / 6.3 vueltas / ~7 m/s en la evaluación externa por pista
+(`docs/kata_eval_20260915_ppo_v2_ptp_final.csv`): vueltas en 8 de 10 katas, falla Heian Yondan
+(horquilla) y Bassai Dai. Etapas 1–6 por métrica, 7–9 por presupuesto.
+
+| PPO, política final | Éxito | Vueltas/episodio | Velocidad | Katas con vuelta |
+|---|---|---|---|---|
+| ProgressTimePenalty, acción v1 (noche 1) | 0.57 | 2.7 | ~3 m/s | 6/10 |
+| ProgressTimePenalty, acción v2 | 0.68 | 6.3 | ~7 m/s | 8/10 |
+| Kohonda, acción v2 | 0.70 (pico 1.00 en iter 350–450) | 7.9 | ~7.9 m/s | 9/10 |
+
+El espacio de acción v2 explica el salto de velocidad; Kohonda añade éxito y, sobre todo,
+aprendizaje más rápido (0.90 frente a 0.25 en evaluación a 1.6 M pasos).
+
+**SAC v3** (`initial_alpha 1.0`, `target_entropy −1`, `alpha_lr 3e-5`): `alpha` ya no colapsa
+(0.85 → 0.43 en 200k pasos), pero con la recompensa de Kohonda (~0.15 por paso) un `alpha` de
+0.5 hace que el término de entropía domine: 1.5 m/s, choque a los 5 s, 0 vueltas, Q media
+17–25 frente a retornos reales ~11. Parado a los 196k pasos.
+**SAC v3b** (`initial_alpha 0.1`, resto igual) lanzado a las 16:58; `alpha` estable en 0.1 y Q
+media coherente en las primeras iteraciones.
