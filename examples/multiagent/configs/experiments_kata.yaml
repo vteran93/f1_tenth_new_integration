@@ -331,6 +331,41 @@ experiments:
       env_runners:           { rollout_fragment_length: 50 }
       resources:             { num_cpus_for_main_process: 4 }
 
+  - name: kata_v3b_SAC_shared_Kohonda
+    storage_path: ../models_kata
+    training:
+      algorithm:       SAC
+      shared_policy:   true
+      reward_function: KohondaMultiAgentF110Env
+      timesteps_total: 3_000_000
+      eval_interval:   25
+      plateau_stop:    false
+      checkpoint_metric: eval/lap_success_last
+    evaluation:
+      episodes: 10
+      explore:  false
+      env:
+        <<: *eval_env
+        speed_action_range: [0.5, 8.0]
+    env:
+      <<: *env
+      speed_action_range: [0.5, 8.0]
+      curriculum:
+        manifest: maps/kata_curriculum.yaml
+        stage: 0
+        mix_prev: 0.25
+        use_stage_speed: true
+        promotion: { metric: lap_success_mean, success_threshold: 0.8, streak: 3, min_steps: 60_000, max_steps: 400_000 }
+    sac_params:
+      <<: *sac_params
+      initial_alpha:         0.1        # v3 (1.0) over-corrected: with Kohonda's ~0.15/step reward the entropy term dominated (1.5 m/s, random actions, 0 laps at 200k)
+      target_entropy:        -1.0
+      optimization_config:   { actor_learning_rate: 0.0003, critic_learning_rate: 0.0003, entropy_learning_rate: 0.00003 }
+      training_intensity:    32
+      replay_buffer_config:  { type: MultiAgentReplayBuffer, capacity: 500000 }
+      env_runners:           { rollout_fragment_length: 50 }
+      resources:             { num_cpus_for_main_process: 4 }
+
   # Tiny smoke test: 2 runners, promotion by budget every 2k steps, eval every 2 iterations.
   - name: kata_SMOKE_PPO
     storage_path: ../models_kata_smoke
