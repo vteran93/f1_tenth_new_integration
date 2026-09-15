@@ -23,7 +23,8 @@ status() {
 case "${1:-start}" in
   start)
     for e in "${EXPS[@]}"; do
-      if pgrep -f "train --experiment $e" >/dev/null; then echo "$e already running"; continue; fi
+      # anchored to the python process so a shell whose command line merely mentions the name does not match
+      if pgrep -f "^[^ ]*python[^ ]* run.py .*--experiment $e\$" >/dev/null; then echo "$e already running"; continue; fi
       log=logs/${e}_$(date +%Y%m%d_%H%M%S).log
       nohup $PY run.py --config $CFG train --experiment "$e" > "$log" 2>&1 &
       echo "started $e (pid $!) -> $log"
@@ -32,8 +33,8 @@ case "${1:-start}" in
     ;;
   status) status ;;
   stop)
-    for e in "${EXPS[@]}"; do pkill -f "train --experiment $e" && echo "stopped $e" || echo "$e not running"; done
-    sleep 3; pkill -f "ray::" || true
+    for e in "${EXPS[@]}"; do pkill -f "^[^ ]*python[^ ]* run.py .*--experiment $e\$" && echo "stopped $e" || echo "$e not running"; done
+    sleep 3; pkill -f "^ray::" || true
     ;;
   *) echo "usage: $0 [start|status|stop]"; exit 1 ;;
 esac
